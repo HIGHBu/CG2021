@@ -1,34 +1,39 @@
-window.onload=function(){
+window.onload = function () {
 
     show();
-    
-    
+
+
     function initShaderProgram(gl, vsSource, fsSource) {
         //加载顶点着色器、片段着色器
         const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
         const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
-      
+
         //创建着色器程序
         const shaderProgram = gl.createProgram();
         gl.attachShader(shaderProgram, vertexShader);
         gl.attachShader(shaderProgram, fragmentShader);
         //链接
         gl.linkProgram(shaderProgram);
-      
+
         return shaderProgram;
     }
-    
-    function initProgram(){
+    const viewMatrix = mat4.create();
+    var eye = [0, 0, 6];
+    var center = [0, 0, 0];
+    var up = [0, 2, 0];
+    mat4.lookAt(viewMatrix, eye, center, up);
+
+    function initProgram() {
         //准备webGL的上下文：获取canvas的引用并保存在canvas变量里，并获取webGLRenderingContest并赋值给gl
         //gl会用来引用webGL上下文
         const canvas = document.querySelector('#glcanvas');
         const gl = canvas.getContext('webgl');
-    
+
         if (!gl) {
             alert('Unable to initialize WebGL. Your browser or machine may not support it.');
             return;
         }
-    
+
         //定义顶点着色器
         const vsSource = `
         attribute vec4 aVertexColor; //颜色属性，用四维向量表示（第四维无意义，用于计算）
@@ -45,39 +50,121 @@ window.onload=function(){
           vColor = aVertexColor;        //点的颜色
         }
       `;
-    
-      //定义片段着色器
-      const fsSource = `
+
+        //定义片段着色器
+        const fsSource = `
         varying lowp vec4 vColor;
         void main() {
           gl_FragColor = vColor;
         }
       `;
-    
+        canvas.onmousedown = handleMouseDown;
+        canvas.onmouseup = handleMouseUp;
+        canvas.onmousemove = handleMouseMove;
+        canvas.onmouseout = handleMouseOut;
+        document.onkeydown = handleKeyDown;
+        document.onkeyup = handleKeyUp;
         //初始化着色器程序
         const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-    
+
         //收集着色器程序会用到的所有信息
         const programInfo = {
-          program: shaderProgram,
-          attribLocations: {
-            vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
-            vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
-          },
-          uniformLocations: {
-            projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
-            viewMatrix: gl.getUniformLocation(shaderProgram, 'uViewMatrix'),
-            modelMatrix: gl.getUniformLocation(shaderProgram, 'uModelMatrix'),
-          },
+            program: shaderProgram,
+            attribLocations: {
+                vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
+                vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
+            },
+            uniformLocations: {
+                projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
+                viewMatrix: gl.getUniformLocation(shaderProgram, 'uViewMatrix'),
+                modelMatrix: gl.getUniformLocation(shaderProgram, 'uModelMatrix'),
+            },
         };
-        return{
-            canvas:canvas,
-            gl:gl,
-            programInfo:programInfo,
+        return {
+            canvas: canvas,
+            gl: gl,
+            programInfo: programInfo,
         }
     }
-    
-    function initBuffers(gl, positions, colors, indices){
+    var mouseDown = false;
+    var lastMouseX = null;
+    var lastMouseY = null;
+    function handleMouseDown(event) {
+        mouseDown = true;
+        lastMouseX = event.clientX;
+        lastMouseY = event.clientY;
+    }
+    function handleMouseUp() {
+        mouseDown = false;
+    }
+    function handleMouseOut() {
+        mouseDown = false;
+    }
+    function handleMouseMove(event) {
+        if (!mouseDown) {
+            return;
+        }
+        var newX = event.clientX;
+        var newY = event.clientY;
+        var deltaX = newX - lastMouseX;
+        var deltaY = newY - lastMouseY;
+        mat4.rotate(viewMatrix,  // destination matrix
+            viewMatrix,  // matrix to rotate
+            deltaX / 1200.0,     // amount to rotate in radians
+            [0, 0, 1]);       // axis to rotate around (Z)
+        mat4.rotate(viewMatrix,  // destination matrix
+            viewMatrix,  // matrix to rotate
+            deltaY / 1200.0,     // amount to rotate in radians
+            [0, 1, 0]);       // axis to rotate around (Y)
+        lastMouseX = newX;
+        lastMouseY = newY;
+
+    }
+    var flag = 0;
+    var speed = 1;
+    var del = 0.1;
+    var translation = [0, 0, -6];
+    var rotation = new Object();
+    rotation.rad = 0;
+    rotation.axis = [0, 0, 1];
+    function handleKeyDown(event) {
+        flag = 1;
+        //currentlyPressedKeys[event.keyCode] = true;
+        if (String.fromCharCode(event.keyCode) == "W") {//加速，model和view同步
+            speed += del;
+            // mat4.translate(viewMatrix,     // destination matrix
+            //     viewMatrix,     // matrix to translate
+            //     [0, -0.1, 0]);  // amount to translate
+
+        }
+        else if (String.fromCharCode(event.keyCode) == "A") {//飞机向左的旋转效果
+            translation[0]-=del;
+            rotation.rad += del;
+            rotation.aixs[0]=1;
+        }
+        else if (String.fromCharCode(event.keyCode) == "S") {//减速，model和view同步
+            if (speed > del) {
+                speed -= del;
+            }
+            // mat4.translate(viewMatrix,     // destination matrix
+            //     viewMatrix,     // matrix to translate
+            //     [0, 0.1, 0]);  // amount to translate
+        }
+        else if (String.fromCharCode(event.keyCode) == "D") {//飞机向右的旋转效果
+            translation[0]+=del;
+            rotation.rad -= del;
+            rotation.aixs[0]=1;
+        }
+    }
+    function handleKeyUp(event) {
+        flag = 0;
+        rotation.aixs[0]=0;
+        //currentlyPressedKeys[event.keyCode] = false;
+    }
+
+
+
+    function initBuffers(gl, positions, colors, indices) {
         //初始化一个面的buffer
         // 1.顶点缓冲区
         // Create a buffer for the cube's vertex positions.
@@ -89,8 +176,8 @@ window.onload=function(){
         // shape. We do this by creating a Float32Array from the
         // JavaScript array, then use it to fill the current buffer.
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-    
-    
+
+
         // 2.创建纹理坐标到立方体各个面的顶点的映射关系
         // const textureCoordBuffer = gl.createBuffer();   //创建一个GL缓存区保存每个面的纹理坐标信息
         // gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer); //把这个缓存区绑定到GL
@@ -101,10 +188,10 @@ window.onload=function(){
         //绑定缓冲区
         gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
         //将colors数据传入webGL缓冲区
-        gl.bufferData(gl.ARRAY_BUFFER, 
-                      new Float32Array(colors),
-                      gl.STATIC_DRAW);
-    
+        gl.bufferData(gl.ARRAY_BUFFER,
+            new Float32Array(colors),
+            gl.STATIC_DRAW);
+
         // 3.索引缓冲区
         // Build the element array buffer; this specifies the indices
         // into the vertex arrays for each face's vertices.
@@ -113,37 +200,37 @@ window.onload=function(){
         // Now send the element array to GL
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
             new Uint16Array(indices), gl.STATIC_DRAW);
-        return{
+        return {
             position: positionBuffer,
             color: colorBuffer,
             index: indexBuffer,
             indices: indices,
         }
     }
-    
+
     function loadShader(gl, type, source) {
         const shader = gl.createShader(type);
-    
+
         // Send the source to the shader object
-    
+
         gl.shaderSource(shader, source);
-    
+
         // Compile the shader program
-    
+
         gl.compileShader(shader);
-    
+
         // See if it compiled successfully
-    
+
         if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
             alert('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
             gl.deleteShader(shader);
             return null;
         }
-    
+
         return shader;
     }
-    
-    function initOneCube(Program, center, size, color){
+
+    function initOneCube(Program, center, size, color) {
         const positions = [];
         const colors = [];
         const indices = [
@@ -158,7 +245,7 @@ window.onload=function(){
             1, 5, 7,
             1, 3, 7,
             4, 5, 6,
-            5, 6, 7 
+            5, 6, 7
         ];
         {
             positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
@@ -178,12 +265,12 @@ window.onload=function(){
             positions.push(center[0] - size[0] / 2); positions.push(center[1] - size[1] / 2); positions.push(center[2] - size[2] / 2);
             colors.push(color[0], color[1], color[2], color[3]);
         }
-    
+
         const buffers = initBuffers(Program.gl, positions, colors, indices);
         return buffers;
     }
-    
-    function draw(Program, buffers, modelMatrix, viewMatrix, projectionMatrix){
+
+    function draw(Program, buffers, modelMatrix, projectionMatrix) {
         //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
         {
             const numComponents = 3;//每次取出3个数值
@@ -202,7 +289,7 @@ window.onload=function(){
             Program.gl.enableVertexAttribArray(
                 Program.programInfo.attribLocations.vertexPosition);
         }
-              
+
         //为webGL设置从缓冲区抽取颜色数据的属性值，将其放入着色器信息
         {
             const numComponents = 4;//每次取出4个数值
@@ -221,13 +308,13 @@ window.onload=function(){
             Program.gl.enableVertexAttribArray(
                 Program.programInfo.attribLocations.vertexColor);
         }
-            
+
         // Tell WebGL which indices to use to index the vertices
         Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
-            
+
         //webGL使用此程序进行绘制
         Program.gl.useProgram(Program.programInfo.program);
-            
+
         // 设置着色器的uniform型变量
         Program.gl.uniformMatrix4fv(
             Program.programInfo.uniformLocations.projectionMatrix,
@@ -241,18 +328,17 @@ window.onload=function(){
             Program.programInfo.uniformLocations.modelMatrix,
             false,
             modelMatrix);
-    
+
         {
             const offset = 0;
             const type = Program.gl.UNSIGNED_SHORT;
-            const vertexCount =  buffers.indices.length;
+            const vertexCount = buffers.indices.length;
             //按连续的三角形方式以此按点绘制
             Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
         }
-        //rotation.rad += deltaTime;
     }
 
-    function setModelMatrix(translation, rotation){
+    function setModelMatrix(translation, rotation) {
         const modelMatrix = mat4.create();
         mat4.translate(modelMatrix,     // destination matrix
             modelMatrix,     // matrix to translate
@@ -264,25 +350,25 @@ window.onload=function(){
         return modelMatrix;
     }
 
-    function setViewMatrix(translation, rotation){
-        const viewMatrix = mat4.create();
-        mat4.translate(viewMatrix,     // destination matrix
-            viewMatrix,     // matrix to translate
-            translation);  // amount to translate
-        mat4.rotate(viewMatrix,  // destination matrix
-            viewMatrix,  // matrix to rotate
-            rotation.rad,     // amount to rotate in radians
-            rotation.axis);       // axis to rotate around (Z)
-        return viewMatrix;
-    }
-    
-    function setProjectionMatrix(gl){
+    // function setViewMatrix(translation, rotation) {
+    //     const viewMatrix = mat4.create();
+    //     mat4.translate(viewMatrix,     // destination matrix
+    //         viewMatrix,     // matrix to translate
+    //         translation);  // amount to translate
+    //     mat4.rotate(viewMatrix,  // destination matrix
+    //         viewMatrix,  // matrix to rotate
+    //         rotation.rad,     // amount to rotate in radians
+    //         rotation.axis);       // axis to rotate around (Z)
+    //     return viewMatrix;
+    // }
+
+    function setProjectionMatrix(gl) {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
         const zNear = 0.1;
         const zFar = 100.0;
         const projectionMatrix = mat4.create();
-    
+
         // note: glmatrix.js always has the first argument
         // as the destination to receive the result.
         mat4.perspective(projectionMatrix,
@@ -292,24 +378,12 @@ window.onload=function(){
             zFar);
         return projectionMatrix;
     }
-    
-    // var rotation = function(rad, axis){
-    //     this.rad = rad;
-    //     this.axis = axis;
-    // };
-    
-    function show(){
+
+    function show() {
         const Program = initProgram();
-        var center = [0,0,0];
-        var size = [3,4,5];
-        var color = [1,0,0,1];
-        var translation = [0,0,-6];
-        //var rotation = (new rotation(0, [0,0,1]));
-        var rotation = new Object();
-        rotation.rad = 0;
-        rotation.axis = [0,0,1];
-
-
+        var center = [0, 0, 0];
+        var size = [3, 4, 5];
+        var color = [1, 0, 0, 1];
         const Cubebuffer = initOneCube(Program, center, size, color);
 
         Program.gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
@@ -319,18 +393,20 @@ window.onload=function(){
         Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);
 
         var then = 0;
-
         // Draw the scene repeatedly
         function render(now) {
             now *= 0.001;  // convert to seconds
             const deltaTime = now - then;
             then = now;
             const modelMatrix = setModelMatrix(translation, rotation);
-            const viewMatrix = setViewMatrix(translation, rotation);
+            // viewMatrix = setViewMatrix(translation, rotation);
             const projectionMatrix = setProjectionMatrix(Program.gl);
-            draw(Program, Cubebuffer, modelMatrix, viewMatrix, projectionMatrix);
-            rotation.rad += deltaTime;
+            mat4.translate(viewMatrix,     // 使观察视角始终与飞机相同
+                viewMatrix,
+                [0, 0, deltaTime * speed]);
             requestAnimationFrame(render);
+            draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
+            translation[2] -= deltaTime * speed;//让飞机每秒都按速度向前
         }
         requestAnimationFrame(render);
     }
