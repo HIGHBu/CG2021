@@ -2,7 +2,6 @@ window.onload = function () {
 
     show();
 
-
     function initShaderProgram(gl, vsSource, fsSource) {
         //加载顶点着色器、片段着色器
         const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vsSource);
@@ -138,9 +137,9 @@ window.onload = function () {
 
         }
         else if (String.fromCharCode(event.keyCode) == "A") {//飞机向左的旋转效果
-            translation[0]-=del;
+            translation[0] -= del;
             rotation.rad += del;
-            rotation.aixs[0]=1;
+            rotation.aixs[0] = 1;
         }
         else if (String.fromCharCode(event.keyCode) == "S") {//减速，model和view同步
             if (speed > del) {
@@ -151,19 +150,16 @@ window.onload = function () {
             //     [0, 0.1, 0]);  // amount to translate
         }
         else if (String.fromCharCode(event.keyCode) == "D") {//飞机向右的旋转效果
-            translation[0]+=del;
+            translation[0] += del;
             rotation.rad -= del;
-            rotation.aixs[0]=1;
+            rotation.aixs[0] = 1;
         }
     }
     function handleKeyUp(event) {
         flag = 0;
-        rotation.aixs[0]=0;
+        rotation.aixs[0] = 0;
         //currentlyPressedKeys[event.keyCode] = false;
     }
-
-
-
     function initBuffers(gl, positions, colors, indices) {
         //初始化一个面的buffer
         // 1.顶点缓冲区
@@ -269,6 +265,43 @@ window.onload = function () {
         const buffers = initBuffers(Program.gl, positions, colors, indices);
         return buffers;
     }
+    function initOneBall(Program, center, radius, color) {
+        var positions = new Array();
+        for (i = 0; i <= 180; i += 1) {//fai
+            for (j = 0; j <= 360; j += 1) {//theata
+                positions.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180) + center[0]);
+                positions.push(radius * Math.sin(Math.PI * i / 180) * Math.sin(Math.PI * j / 180) + center[1]);
+                positions.push(radius * Math.cos(Math.PI * i / 180) + center[2]);
+            }
+        }
+        var colors = new Array();
+        for (i = 0; i <= 180; i += 1) {
+            for (j = 0; j <= 360; j += 1) {
+                if (j < 175) {
+                    colors.push(color[0]);  //R
+                }
+                else {
+                    colors.push(0);  //R
+                }
+                colors.push(color[1]);  //G
+                colors.push(color[2]);  //B
+                colors.push(color[3]);  //Alpha
+            }
+        }
+        var indices = new Array();
+        for (i = 0; i < 180; i += 1) {//fai
+            for (j = 0; j < 360; j += 1) {//theata
+                indices.push(360 * i + j);
+                indices.push(360 * i + (j + 1));
+                indices.push(360 * (i + 1) + j);
+                indices.push(360 * (i + 1) + j + 1);
+                indices.push(360 * i + (j + 1));
+                indices.push(360 * (i + 1) + j);
+            }
+        }
+        const buffers = initBuffers(Program.gl, positions, colors, indices);
+        return buffers;
+    }
 
     function draw(Program, buffers, modelMatrix, projectionMatrix) {
         //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
@@ -338,6 +371,7 @@ window.onload = function () {
         }
     }
 
+
     function setModelMatrix(translation, rotation) {
         const modelMatrix = mat4.create();
         mat4.translate(modelMatrix,     // destination matrix
@@ -384,7 +418,23 @@ window.onload = function () {
         var center = [0, 0, 0];
         var size = [3, 4, 5];
         var color = [1, 0, 0, 1];
+        var center1 = [0.0, 0.0, 0.0];
+        var center2 = [0.5, 0.0, 0.0];
+        var center3 = [0.0, 0.5, 0.0];
+        var center4 = [0, 0.15, 0.0];
+        var radius1 = 0.2;
+        var radius2 = 0.15;
+        var radius3 = 0.15;
+        var radius4 = 0.1;
+        var color1 = [220 / 255.0, 47 / 255.0, 31 / 255.0, 1.0];//Red
+        var color2 = [80 / 255.0, 24 / 255.0, 21 / 255.0, 1.0];//Black
+        var color3 = [60 / 255.0, 107 / 255.0, 176 / 255.0, 1.0];//Blue
+        var color4 = [239 / 255.0, 169 / 255.0, 13 / 255.0, 1.0];//Yellow
         const Cubebuffer = initOneCube(Program, center, size, color);
+        const ballbuffer1 = initOneBall(Program, center1, radius1, color1);
+        const ballbuffer2 = initOneBall(Program, center2, radius2, color2);
+        const ballbuffer3 = initOneBall(Program, center3, radius3, color3);
+        const ballbuffer4 = initOneBall(Program, center4, radius4, color4);
 
         Program.gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
         Program.gl.clearDepth(1.0);                 // Clear everything
@@ -399,6 +449,10 @@ window.onload = function () {
             const deltaTime = now - then;
             then = now;
             const modelMatrix = setModelMatrix(translation, rotation);
+            const modelMatrix1 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix2 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix3 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix4 = setModelMatrix([0, 0, 0], rotation);
             // viewMatrix = setViewMatrix(translation, rotation);
             const projectionMatrix = setProjectionMatrix(Program.gl);
             mat4.translate(viewMatrix,     // 使观察视角始终与飞机相同
@@ -406,6 +460,10 @@ window.onload = function () {
                 [0, 0, deltaTime * speed]);
             requestAnimationFrame(render);
             draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
+            draw(Program, ballbuffer1, modelMatrix1, projectionMatrix);
+            draw(Program, ballbuffer2, modelMatrix2, projectionMatrix);
+            draw(Program, ballbuffer3, modelMatrix3, projectionMatrix);
+            draw(Program, ballbuffer4, modelMatrix4, projectionMatrix);
             translation[2] -= deltaTime * speed;//让飞机每秒都按速度向前
         }
         requestAnimationFrame(render);
