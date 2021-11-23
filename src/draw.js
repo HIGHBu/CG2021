@@ -1,11 +1,17 @@
 var objbuffers = [];
-
+var eye = [0, 0, 6];
+var target = [0, 0, 0];
+var up = [0, 2, 0];
+var cw = 0.0;
+var ch = 0.0;
+var viewMatrix;
 function initProgram() {
     //准备webGL的上下文：获取canvas的引用并保存在canvas变量里，并获取webGLRenderingContest并赋值给gl
     //gl会用来引用webGL上下文
     const canvas = document.querySelector('#glcanvas');
     const gl = canvas.getContext('webgl');
-
+    cw = canvas.clientWidth;
+    ch = canvas.clientHeight;
     if (!gl) {
         alert('Unable to initialize WebGL. Your browser or machine may not support it.');
         return;
@@ -81,8 +87,8 @@ function initShaderProgram(gl, vsSource, fsSource) {
 
 
 var mouseDown = false;
-var lastMouseX = null;
-var lastMouseY = null;
+var lastMouseX = 0;
+var lastMouseY = 0;
 function handleMouseDown(event) {
     mouseDown = true;
     lastMouseX = event.clientX;
@@ -102,17 +108,33 @@ function handleMouseMove(event) {
     var newY = event.clientY;
     var deltaX = newX - lastMouseX;
     var deltaY = newY - lastMouseY;
-    mat4.rotate(viewMatrix,  // destination matrix
-        viewMatrix,  // matrix to rotate
-        deltaX / 1200.0,     // amount to rotate in radians
-        [0, 0, 1]);       // axis to rotate around (Z)
-    mat4.rotate(viewMatrix,  // destination matrix
-        viewMatrix,  // matrix to rotate
-        deltaY / 1200.0,     // amount to rotate in radians
-        [0, 1, 0]);       // axis to rotate around (Y)
+    var radx = 0.0, rady = 0.0;
+    //旋转角度radx，横向拖动时的变化，将其转化到弧度
+    radx = (2 * Math.PI) * deltaX * 0.5 / cw;
+    //旋转角度rady，纵向拖动时的变化，将其转化到弧度
+    rady = -1 * (2 * Math.PI) * deltaY * 0.5 / ch;
+    //获取视点，up向量,和目标点三个三维向量确立视角坐标系
+    var vec3_eye = vec3.fromValues(eye[0], eye[1], eye[2]);
+    var vec3_up = vec3.fromValues(up[0], up[1], up[2]);
+    var vec3_target = vec3.fromValues(target[0], target[1], target[2]);
+    //求出视线方向
+    var vec3_eye2target = vec3.create();
+    vec3.subtract(vec3_eye2target, vec3_eye, vec3_target);
+    //求出横向旋转的方向，即y方向绕其旋转
+    var vec3_rotation_y = vec3.create();
+    vec3.cross(vec3_rotation_y, vec3_eye2target, vec3_up);
+    var rotation_y = [vec3_rotation_y[0], vec3_rotation_y[1], vec3_rotation_y[2]];
+    //x方向绕up旋转，通过rotate变换绕两方向旋转得出变换矩阵
+    mat4.rotate(viewMatrix,
+        viewMatrix,
+        radx,
+        up);
+    mat4.rotate(viewMatrix,
+        viewMatrix,
+        rady,
+        rotation_y);
     lastMouseX = newX;
     lastMouseY = newY;
-
 }
 var flag = 0;
 var speed = 1;
@@ -126,10 +148,6 @@ function handleKeyDown(event) {
     //currentlyPressedKeys[event.keyCode] = true;
     if (String.fromCharCode(event.keyCode) == "W") {//加速，model和view同步
         speed += del;
-        // mat4.translate(viewMatrix,     // destination matrix
-        //     viewMatrix,     // matrix to translate
-        //     [0, -0.1, 0]);  // amount to translate
-
     }
     else if (String.fromCharCode(event.keyCode) == "A") {//飞机向左的旋转效果
         translation[0] -= del;
@@ -140,9 +158,6 @@ function handleKeyDown(event) {
         if (speed > del) {
             speed -= del;
         }
-        // mat4.translate(viewMatrix,     // destination matrix
-        //     viewMatrix,     // matrix to translate
-        //     [0, 0.1, 0]);  // amount to translate
     }
     else if (String.fromCharCode(event.keyCode) == "D") {//飞机向右的旋转效果
         translation[0] += del;
@@ -153,7 +168,6 @@ function handleKeyDown(event) {
 function handleKeyUp(event) {
     flag = 0;
     rotation.aixs[0] = 0;
-    //currentlyPressedKeys[event.keyCode] = false;
 }
 
 
@@ -225,18 +239,12 @@ function loadShader(gl, type, source) {
 }
 
 
-window.onload = function(){
+window.onload = function () {
     //var objDocs = [];      // The information of OBJ file
     //var objInfos = [];
-    
     show();
-    
-    const viewMatrix = mat4.create();
-    var eye = [0, 0, 6];
-    var center = [0, 0, 0];
-    var up = [0, 2, 0];
-    mat4.lookAt(viewMatrix, eye, center, up);
-
+    viewMatrix = mat4.create();
+    mat4.lookAt(viewMatrix, eye, target, up);
 
     function initOneCube(Program, center, size, color) {
         const positions = [];
@@ -383,7 +391,6 @@ window.onload = function(){
         }
     }
 
-
     function setModelMatrix(translation, rotation) {
         const modelMatrix = mat4.create();
         mat4.translate(modelMatrix,     // destination matrix
@@ -396,27 +403,12 @@ window.onload = function(){
         return modelMatrix;
     }
 
-    // function setViewMatrix(translation, rotation) {
-    //     const viewMatrix = mat4.create();
-    //     mat4.translate(viewMatrix,     // destination matrix
-    //         viewMatrix,     // matrix to translate
-    //         translation);  // amount to translate
-    //     mat4.rotate(viewMatrix,  // destination matrix
-    //         viewMatrix,  // matrix to rotate
-    //         rotation.rad,     // amount to rotate in radians
-    //         rotation.axis);       // axis to rotate around (Z)
-    //     return viewMatrix;
-    // }
-
     function setProjectionMatrix(gl) {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
         const zNear = 0.1;
         const zFar = 100.0;
         const projectionMatrix = mat4.create();
-
-        // note: glmatrix.js always has the first argument
-        // as the destination to receive the result.
         mat4.perspective(projectionMatrix,
             fieldOfView,
             aspect,
@@ -427,7 +419,6 @@ window.onload = function(){
 
     function show() {
         const Program = initProgram();
-
         var center = [0, 0, 0];
         var size = [3, 4, 5];
         var color = [1, 0, 0, 1];
@@ -466,23 +457,22 @@ window.onload = function(){
             const deltaTime = now - then;
             then = now;
             // const modelMatrix = setModelMatrix(translation, rotation);
-            // const modelMatrix1 = setModelMatrix([0, 0, 0], rotation);
-            // const modelMatrix2 = setModelMatrix([0, 0, 0], rotation);
-            // const modelMatrix3 = setModelMatrix([0, 0, 0], rotation);
-            // const modelMatrix4 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix1 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix2 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix3 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix4 = setModelMatrix([0, 0, 0], rotation);
             const modelMatrix5 = setModelMatrix(translation, rotation);
-            // viewMatrix = setViewMatrix(translation, rotation);
             const projectionMatrix = setProjectionMatrix(Program.gl);
             mat4.translate(viewMatrix,     // 使观察视角始终与飞机相同
                 viewMatrix,
                 [0, 0, deltaTime * speed]);
             requestAnimationFrame(render);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
-            // draw(Program, ballbuffer1, modelMatrix1, projectionMatrix);
-            // draw(Program, ballbuffer2, modelMatrix2, projectionMatrix);
-            // draw(Program, ballbuffer3, modelMatrix3, projectionMatrix);
-            // draw(Program, ballbuffer4, modelMatrix4, projectionMatrix);
-            if(objbuffers[0])
+            draw(Program, ballbuffer1, modelMatrix1, projectionMatrix);
+            draw(Program, ballbuffer2, modelMatrix2, projectionMatrix);
+            draw(Program, ballbuffer3, modelMatrix3, projectionMatrix);
+            draw(Program, ballbuffer4, modelMatrix4, projectionMatrix);
+            if (objbuffers[0])
                 draw(Program, objbuffers[0], modelMatrix5, projectionMatrix);
             translation[2] -= deltaTime * speed;//让飞机每秒都按速度向前
         }
