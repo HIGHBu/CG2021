@@ -208,8 +208,9 @@ window.onload = function () {
         const ballbuffer3 = initOneBall(Program, center3, radius3, color3);
         const ballbuffer4 = initOneBall(Program, center4, radius4, color4);
 
+        // LoadObjFile(Program.gl, '../obj/cube.obj', objbuffers, 3, false, 0);
 
-        LoadObjFile(Program.gl, '../obj/cube.obj', objbuffers, 3, false, 0);
+        LoadObjFile(Program.gl, '../obj/plane/su.obj', objbuffers, 0.3, false, 0);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
         Program.gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
