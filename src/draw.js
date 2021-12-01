@@ -4,15 +4,25 @@ var target = [0, 0, 0];
 var up = [0, 2, 0];
 var cw = 0.0;
 var ch = 0.0;
-var viewMatrix;
 
+
+var speed = 1;
+var del = 0.1;
+var translation = [0, 0, -6];
+
+var Rotation = function(rad, axis) {
+    this.rad = rad;
+    this.axis = axis;
+  }
+var rotation = new Rotation(0, [0,0,1]);
 
 window.onload = function () {
     //var objDocs = [];      // The information of OBJ file
     //var objInfos = [];
-    show();
-    viewMatrix = mat4.create();
-    mat4.lookAt(viewMatrix, eye, target, up);
+    var lightColor = vec3.fromValues(1.0, 1.0, 1.0);
+    var ambientLight = vec3.fromValues(0.4, 0.4, 0.4);
+    var lightPosition = vec3.fromValues(0, 0, 0);
+    show()
 
     function initOneCube(Program, center, size, color) {
         const positions = [];
@@ -55,11 +65,16 @@ window.onload = function () {
     }
     function initOneBall(Program, center, radius, color) {
         var positions = new Array();
+        var normals = new Array();
+        
         for (i = 0; i <= 180; i += 1) {//fai
             for (j = 0; j <= 360; j += 1) {//theata
                 positions.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180) + center[0]);
                 positions.push(radius * Math.sin(Math.PI * i / 180) * Math.sin(Math.PI * j / 180) + center[1]);
                 positions.push(radius * Math.cos(Math.PI * i / 180) + center[2]);
+                normals.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180));
+                normals.push(radius * Math.sin(Math.PI * i / 180) * Math.sin(Math.PI * j / 180));
+                normals.push(radius * Math.cos(Math.PI * i / 180));
             }
         }
         var colors = new Array();
@@ -91,7 +106,7 @@ window.onload = function () {
         return buffers;
     }
 
-    function draw(Program, buffers, modelMatrix, projectionMatrix) {
+    function draw(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
         //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
         {
             const numComponents = 3;//每次取出3个数值
@@ -110,7 +125,24 @@ window.onload = function () {
             Program.gl.enableVertexAttribArray(
                 Program.programInfo.attribLocations.vertexPosition);
         }
-
+        //为webGL设置从缓冲区抽取法向量数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.normal);
+            Program.gl.vertexAttribPointer(
+                Program.programInfo.attribLocations.vertexNormal,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.programInfo.attribLocations.vertexNormal);
+        }
         //为webGL设置从缓冲区抽取颜色数据的属性值，将其放入着色器信息
         {
             const numComponents = 4;//每次取出4个数值
@@ -149,7 +181,24 @@ window.onload = function () {
             Program.programInfo.uniformLocations.modelMatrix,
             false,
             modelMatrix);
+        //用于计算新法向量的矩阵
+        const normalMatrix = mat4.create();
+        mat4.invert(normalMatrix, modelMatrix);
+        mat4.transpose(normalMatrix, normalMatrix);
 
+        Program.gl.uniformMatrix4fv(
+            Program.programInfo.uniformLocations.normalMatrix,
+            false,
+            normalMatrix);
+        Program.gl.uniform3fv(
+            Program.programInfo.uniformLocations.uLightColor,
+            lightColor);
+        Program.gl.uniform3fv(
+            Program.programInfo.uniformLocations.uAmbientLight,
+            ambientLight);
+        Program.gl.uniform3fv(
+            Program.programInfo.uniformLocations.uLightPosition,
+            lightPosition);
         {
             const offset = 0;
             const type = Program.gl.UNSIGNED_SHORT;
@@ -170,12 +219,18 @@ window.onload = function () {
             rotation.axis);       // axis to rotate around (Z)
         return modelMatrix;
     }
-
+    //设置视角矩阵，根据视点，目标点和上方向确定视角矩阵
+    function setViewMatrix(){
+        //设置view坐标系
+      const ViewMatrix = mat4.create();
+      mat4.lookAt(ViewMatrix, eye, target, up);
+      return ViewMatrix;
+  }
     function setProjectionMatrix(gl) {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
         const zNear = 0.1;
-        const zFar = 100.0;
+        const zFar = 1000.0;
         const projectionMatrix = mat4.create();
         mat4.perspective(projectionMatrix,
             fieldOfView,
@@ -225,25 +280,27 @@ window.onload = function () {
             now *= 0.001;  // convert to seconds
             const deltaTime = now - then;
             then = now;
-            // const modelMatrix = setModelMatrix(translation, rotation);
-            const modelMatrix1 = setModelMatrix([0, 0, 0], rotation);
-            const modelMatrix2 = setModelMatrix([0, 0, 0], rotation);
-            const modelMatrix3 = setModelMatrix([0, 0, 0], rotation);
-            const modelMatrix4 = setModelMatrix([0, 0, 0], rotation);
-            const modelMatrix5 = setModelMatrix(translation, rotation);
             const projectionMatrix = setProjectionMatrix(Program.gl);
-            mat4.translate(viewMatrix,     // 使观察视角始终与飞机相同
-                viewMatrix,
-                [0, 0, deltaTime * speed]);
+            const viewMatrix = setViewMatrix();
+
+            // const modelMatrix = setModelMatrix(translation, rotation);
+            const modelMatrix1 = setModelMatrix(translation, rotation);
+            const modelMatrix2 = setModelMatrix(translation, rotation);
+            const modelMatrix3 = setModelMatrix(translation, rotation);
+            const modelMatrix4 = setModelMatrix(translation, rotation);
+            const modelMatrix5 = setModelMatrix([0,0,0], rotation);
+
             requestAnimationFrame(render);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
-            draw(Program, ballbuffer1, modelMatrix1, projectionMatrix);
-            draw(Program, ballbuffer2, modelMatrix2, projectionMatrix);
-            draw(Program, ballbuffer3, modelMatrix3, projectionMatrix);
-            draw(Program, ballbuffer4, modelMatrix4, projectionMatrix);
+            draw(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix);
+            draw(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix);
+            draw(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix);
+            draw(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix);
             if (objbuffers[0])
-                draw(Program, objbuffers[0], modelMatrix5, projectionMatrix);
-            translation[2] -= deltaTime * speed;//让飞机每秒都按速度向前
+                draw(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix);
+            translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
+            // eye[2] -= deltaTime * speed;
+            // target[2] -= deltaTime * speed;
         }
         requestAnimationFrame(render);
     }
