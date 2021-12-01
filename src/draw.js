@@ -1,4 +1,5 @@
 var objbuffers = [];
+var objbuffers1 = [];
 var eye = [0, 0, 6];
 var target = [0, 0, 0];
 var up = [0, 2, 0];
@@ -265,7 +266,8 @@ window.onload = function () {
 
         // LoadObjFile(Program.gl, '../obj/cube.obj', objbuffers, 3, false, 0);
 
-        LoadObjFile(Program.gl, '../obj/plane/su.obj', objbuffers, 0.3, false, 0);
+        LoadObjFile(Program.gl, '../obj/plane_min/obj.obj', objbuffers, 0.003,color1, false, 0);
+        LoadObjFile(Program.gl, '../obj/cube.obj', objbuffers1, 3,color3, false, 0);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
         Program.gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
@@ -289,6 +291,7 @@ window.onload = function () {
             const modelMatrix3 = setModelMatrix(translation, rotation);
             const modelMatrix4 = setModelMatrix(translation, rotation);
             const modelMatrix5 = setModelMatrix([0,0,0], rotation);
+            const modelMatrix6 = setModelMatrix([5,5,0], rotation);
 
             requestAnimationFrame(render);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
@@ -298,6 +301,8 @@ window.onload = function () {
             draw(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix);
             if (objbuffers[0])
                 draw(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix);
+            if (objbuffers1[0])
+                draw(Program, objbuffers1[0], modelMatrix6, viewMatrix, projectionMatrix);
             translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
             // eye[2] -= deltaTime * speed;
             // target[2] -= deltaTime * speed;
