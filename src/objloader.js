@@ -249,7 +249,7 @@ function calcNormal(v0, v1, v2) {
 
 // Read a file
 //buffers为全局变量，用于返回构造的buffer，scale为缩放程度，color为想给模型传的颜色，inverse用于指明法线方向是否与模型相反，index为buffer的索引位置
-function LoadObjFile(gl, fileName, buffers, scale, color, inverse, index) {
+function LoadObjFile(gl, fileName, buffers, scale, color, inverse) {
   var request = new XMLHttpRequest();
   request.onreadystatechange = function () {
     if (request.readyState === 4 && request.status !== 404) {
@@ -260,7 +260,7 @@ function LoadObjFile(gl, fileName, buffers, scale, color, inverse, index) {
       var colors = new Array(0);
       var indices = new Array(0);
       var normals = new Array(0);
-
+      var temp;
       var result = objDocs.parse(request.responseText, scale, inverse); // Parse the file
 
       //将obj模型的信息压入positions,colors,indices,normals, 并用其构造buffer
@@ -285,7 +285,8 @@ function LoadObjFile(gl, fileName, buffers, scale, color, inverse, index) {
 
         }
       }
-      buffers[index] = initBuffers(gl, positions, colors, indices, normals);
+      temp=initBuffers(gl, positions, colors, indices, normals);
+      buffers.push(temp);
 
       if (!result) {
         console.log("OBJ file parsing error.");

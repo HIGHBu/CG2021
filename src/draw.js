@@ -11,11 +11,11 @@ var speed = 1;
 var del = 0.1;
 var translation = [0, 0, -6];
 
-var Rotation = function(rad, axis) {
+var Rotation = function (rad, axis) {
     this.rad = rad;
     this.axis = axis;
-  }
-var rotation = new Rotation(0, [0,0,1]);
+}
+var rotation = new Rotation(0, [0, 0, 1]);
 
 window.onload = function () {
     //var objDocs = [];      // The information of OBJ file
@@ -67,7 +67,7 @@ window.onload = function () {
     function initOneBall(Program, center, radius, color) {
         var positions = new Array();
         var normals = new Array();
-        
+
         for (i = 0; i <= 180; i += 1) {//fai
             for (j = 0; j <= 360; j += 1) {//theata
                 positions.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180) + center[0]);
@@ -221,12 +221,12 @@ window.onload = function () {
         return modelMatrix;
     }
     //设置视角矩阵，根据视点，目标点和上方向确定视角矩阵
-    function setViewMatrix(){
+    function setViewMatrix() {
         //设置view坐标系
-      const ViewMatrix = mat4.create();
-      mat4.lookAt(ViewMatrix, eye, target, up);
-      return ViewMatrix;
-  }
+        const ViewMatrix = mat4.create();
+        mat4.lookAt(ViewMatrix, eye, target, up);
+        return ViewMatrix;
+    }
     function setProjectionMatrix(gl) {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
@@ -266,8 +266,8 @@ window.onload = function () {
 
         // LoadObjFile(Program.gl, '../obj/cube.obj', objbuffers, 3, false, 0);
 
-        LoadObjFile(Program.gl, '../obj/plane_min/obj.obj', objbuffers, 0.003,color1, false, 0);
-        LoadObjFile(Program.gl, '../obj/cube.obj', objbuffers1, 3,color3, false, 0);
+        LoadObjFile(Program.gl, '../obj/plane_min/obj.obj', objbuffers, 0.003, color1, false);
+        LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, color3, false);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
         Program.gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
@@ -290,8 +290,8 @@ window.onload = function () {
             const modelMatrix2 = setModelMatrix(translation, rotation);
             const modelMatrix3 = setModelMatrix(translation, rotation);
             const modelMatrix4 = setModelMatrix(translation, rotation);
-            const modelMatrix5 = setModelMatrix([0,0,0], rotation);
-            const modelMatrix6 = setModelMatrix([5,5,0], rotation);
+            const modelMatrix5 = setModelMatrix([0, 0, 0], rotation);
+            const modelMatrix6 = setModelMatrix([0, 0.5, 0], rotation);
 
             requestAnimationFrame(render);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
@@ -301,8 +301,8 @@ window.onload = function () {
             draw(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix);
             if (objbuffers[0])
                 draw(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix);
-            if (objbuffers1[0])
-                draw(Program, objbuffers1[0], modelMatrix6, viewMatrix, projectionMatrix);
+            if (objbuffers[1])
+                draw(Program, objbuffers[1], modelMatrix6, viewMatrix, projectionMatrix);
             translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
             // eye[2] -= deltaTime * speed;
             // target[2] -= deltaTime * speed;
