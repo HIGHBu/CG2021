@@ -15,7 +15,29 @@ function initProgram() {
     canvas.onmouseout = handleMouseOut;
     document.onkeydown = handleKeyDown;
     document.onkeyup = handleKeyUp;
+    const sky_vsSource = `
+    attribute vec4 aTextureCoord;   //纹理坐标
 
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+
+    varying highp vec3 vTextureCoord;
+    
+    void main() {
+      vec4 pos = uProjectionMatrix * uViewMatrix * aTextureCoord;  //点坐标位置
+      gl_Position = pos.xyww; //使其深度始终是w/w = 1,欺骗深度检测使天空盒在深处
+      vTextureCoord = aTextureCoord.xyz;
+    }
+  `;
+    const sky_fsSource = `
+    varying highp vec3 vTextureCoord;
+    
+    uniform samplerCube uSampler;
+
+    void main() {
+      gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
+    }
+  `;
     //定义顶点着色器
     const vsSource = `
     attribute vec4 aVertexColor; //颜色属性，用四维向量表示（第四维无意义，用于计算）
@@ -67,7 +89,7 @@ function initProgram() {
 
     //初始化着色器程序
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
-
+    const sky_shaderProgram = initShaderProgram(gl, sky_vsSource, sky_fsSource);
     //收集着色器程序会用到的所有信息
     const programInfo = {
         program: shaderProgram,
@@ -87,7 +109,17 @@ function initProgram() {
             uAmbientLight: gl.getUniformLocation(shaderProgram, 'uAmbientLight'),
         },
     };
-
+    const sky_programInfo = {
+        program: sky_shaderProgram,
+        attribLocations: {
+            textureCoord: gl.getAttribLocation(sky_shaderProgram, 'aTextureCoord'),              
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(sky_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(sky_shaderProgram, 'uViewMatrix'),
+            uSampler: gl.getUniformLocation(sky_shaderProgram, 'uSampler'),
+        },
+    };
     gl.clearColor(0.5, 0.5, 0.5, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -98,6 +130,7 @@ function initProgram() {
         canvas: canvas,
         gl: gl,
         programInfo: programInfo,
+        sky_programInfo: sky_programInfo,
     }
 }
 
@@ -277,4 +310,161 @@ function loadShader(gl, type, source) {
     }
 
     return shader;
+}
+
+//天空盒buffer，因为纹理坐标与世界坐标是对应的，使用原点到立方体的向量所采样的点即可实现映射，只需要positions信息即可
+function initSkybox(Program) {
+    var scale = 50;
+    const positions = [
+            // positions          
+            -1.0 * scale,  1.0 * scale, -1.0 * scale,
+            -1.0 * scale, -1.0 * scale, -1.0 * scale,
+             1.0 * scale, -1.0 * scale, -1.0 * scale,
+             1.0 * scale, -1.0 * scale, -1.0 * scale,
+             1.0 * scale,  1.0 * scale, -1.0 * scale,
+            -1.0 * scale,  1.0 * scale, -1.0 * scale,
+        
+            -1.0 * scale, -1.0 * scale,  1.0 * scale,
+            -1.0 * scale, -1.0 * scale, -1.0 * scale,
+            -1.0 * scale,  1.0 * scale, -1.0 * scale,
+            -1.0 * scale,  1.0 * scale, -1.0 * scale,
+            -1.0 * scale,  1.0 * scale,  1.0 * scale,
+            -1.0 * scale, -1.0 * scale,  1.0 * scale,
+        
+             1.0 * scale, -1.0 * scale, -1.0 * scale,
+             1.0 * scale, -1.0 * scale,  1.0 * scale,
+             1.0 * scale,  1.0 * scale,  1.0 * scale,
+             1.0 * scale,  1.0 * scale,  1.0 * scale,
+             1.0 * scale,  1.0 * scale, -1.0 * scale,
+             1.0 * scale, -1.0 * scale, -1.0 * scale,
+        
+            -1.0 * scale, -1.0 * scale,  1.0 * scale,
+            -1.0 * scale,  1.0 * scale,  1.0 * scale,
+             1.0 * scale,  1.0 * scale,  1.0 * scale,
+             1.0 * scale,  1.0 * scale,  1.0 * scale,
+             1.0 * scale, -1.0 * scale,  1.0 * scale,
+            -1.0 * scale, -1.0 * scale,  1.0 * scale,
+        
+            -1.0 * scale,  1.0 * scale, -1.0 * scale,
+             1.0 * scale,  1.0 * scale, -1.0 * scale,
+             1.0 * scale,  1.0 * scale,  1.0 * scale,
+             1.0 * scale,  1.0 * scale,  1.0 * scale,
+            -1.0 * scale,  1.0 * scale,  1.0 * scale,
+            -1.0 * scale,  1.0 * scale, -1.0 * scale,
+        
+            -1.0 * scale, -1.0 * scale, -1.0 * scale,
+            -1.0 * scale, -1.0 * scale,  1.0 * scale,
+             1.0 * scale, -1.0 * scale, -1.0 * scale,
+             1.0 * scale, -1.0 * scale, -1.0 * scale,
+            -1.0 * scale, -1.0 * scale,  1.0 * scale,
+             1.0 * scale, -1.0 * scale,  1.0 * scale
+    ];
+  
+    //在positions中所有点信息已经列齐，index只需按序对应即可
+    var indices = new Array();
+    for(var i = 0; i < 36; i++)
+        indices.push(i);
+  
+    const textureCoordBuffer = Program.gl.createBuffer();
+    // Select the positionBuffer as the one to apply buffer
+    // operations to from here out
+    Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, textureCoordBuffer);
+    // Now pass the list of positions into WebGL to build the
+    // shape. We do this by creating a Float32Array from the
+    // JavaScript array, then use it to fill the current buffer.
+    Program.gl.bufferData(Program.gl.ARRAY_BUFFER, new Float32Array(positions), Program.gl.STATIC_DRAW);
+    
+    const indexBuffer = Program.gl.createBuffer();
+    Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    // Now send the element array to GL
+    Program.gl.bufferData(Program.gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array(indices), Program.gl.STATIC_DRAW);
+  
+    return {
+        textureCoord: textureCoordBuffer,
+        index: indexBuffer,
+    }
+    
+  }
+
+  function initOneCube(Program, center, size, color) {
+    const positions = [];
+    const colors = [];
+    const indices = [
+        0, 1, 2,
+        1, 2, 3,
+        2, 3, 6,
+        3, 6, 7,
+        2, 6, 0,
+        0, 6, 4,
+        0, 4, 1,
+        1, 4, 5,
+        1, 5, 7,
+        1, 3, 7,
+        4, 5, 6,
+        5, 6, 7
+    ];
+    {
+        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] + size[0] / 2); positions.push(center[1] - size[1] / 2); positions.push(center[2] + size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] - size[0] / 2); positions.push(center[1] - size[1] / 2); positions.push(center[2] + size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] + size[0] / 2); positions.push(center[1] - size[1] / 2); positions.push(center[2] - size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] - size[0] / 2); positions.push(center[1] - size[1] / 2); positions.push(center[2] - size[2] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+    }
+
+    const buffers = initBuffers(Program.gl, positions, colors, indices);
+    return buffers;
+}
+function initOneBall(Program, center, radius, color) {
+    var positions = new Array();
+    var normals = new Array();
+
+    for (i = 0; i <= 180; i += 1) {//fai
+        for (j = 0; j <= 360; j += 1) {//theata
+            positions.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180) + center[0]);
+            positions.push(radius * Math.sin(Math.PI * i / 180) * Math.sin(Math.PI * j / 180) + center[1]);
+            positions.push(radius * Math.cos(Math.PI * i / 180) + center[2]);
+            normals.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180));
+            normals.push(radius * Math.sin(Math.PI * i / 180) * Math.sin(Math.PI * j / 180));
+            normals.push(radius * Math.cos(Math.PI * i / 180));
+        }
+    }
+    var colors = new Array();
+    for (i = 0; i <= 180; i += 1) {
+        for (j = 0; j <= 360; j += 1) {
+            if (j < 175) {
+                colors.push(color[0]);  //R
+            }
+            else {
+                colors.push(0);  //R
+            }
+            colors.push(color[1]);  //G
+            colors.push(color[2]);  //B
+            colors.push(color[3]);  //Alpha
+        }
+    }
+    var indices = new Array();
+    for (i = 0; i < 180; i += 1) {//fai
+        for (j = 0; j < 360; j += 1) {//theata
+            indices.push(360 * i + j);
+            indices.push(360 * i + (j + 1));
+            indices.push(360 * (i + 1) + j);
+            indices.push(360 * (i + 1) + j + 1);
+            indices.push(360 * i + (j + 1));
+            indices.push(360 * (i + 1) + j);
+        }
+    }
+    const buffers = initBuffers(Program.gl, positions, colors, indices);
+    return buffers;
 }
