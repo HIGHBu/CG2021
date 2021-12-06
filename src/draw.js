@@ -1,36 +1,52 @@
 var objbuffers = [];
-var objbuffers1 = [];
+
 var eye = [0, 0, 6];
 var target = [0, 0, 0];
 var up = [0, 2, 0];
 var cw = 0.0;
 var ch = 0.0;
 
-
 var speed = 1;
 var del = 0.1;
 var translation = [0, 0, -6];
+var nochange_translation = [0, 0, -6];
 
 var Rotation = function (rad, axis) {
     this.rad = rad;
     this.axis = axis;
 }
 var rotation = new Rotation(0, [0, 0, 1]);
+var nochange_rotation = new Rotation(0, [0, 0, 1]);
 var modelrotation = new Rotation(Math.PI, [0, 1, 0]);
 
-
-
-
-
 window.onload = function () {
-    //var objDocs = [];      // The information of OBJ file
-    //var objInfos = [];
     var lightColor = vec3.fromValues(1.0, 1.0, 1.0);
     var ambientLight = vec3.fromValues(0.4, 0.4, 0.4);
-    var lightPosition = vec3.fromValues(0, 0, 0);
+    var lightDirection = vec3.fromValues(0, 0, -1);
+
+    function initTextures(Program, gl, filepath, index) {
+        var texture = gl.createTexture(); // Create texture
+        // var Sampler = Program.programInfo2.uniformLocations.Sampler;
+        var image = new Image(); // Create a image
+        image.onload = function () { loadTexture(Program, gl, texture, image, index); };
+        image.src = filepath;
+        return true;
+    }
+
+    function loadTexture(Program, gl, texture, image, index) {
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+        if (index == 0) gl.activeTexture(gl.TEXTURE0);
+        if (index == 1) gl.activeTexture(gl.TEXTURE1);
+        if (index == 2) gl.activeTexture(gl.TEXTURE2);
+        if (index == 3) gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+
+    }
 
     //天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
-    function drawSkybox(Program, buffer, skybox, viewMatrix, projectionMatrix){
+    function drawSkybox(Program, buffer, skybox, viewMatrix, projectionMatrix) {
         {
             const numComponents = 3;//每次取出3个数值
             const type = Program.gl.FLOAT;//取出数据为浮点数类型
@@ -164,8 +180,131 @@ window.onload = function () {
             Program.programInfo.uniformLocations.uAmbientLight,
             ambientLight);
         Program.gl.uniform3fv(
-            Program.programInfo.uniformLocations.uLightPosition,
-            lightPosition);
+            Program.programInfo.uniformLocations.uLightDirection,
+            lightDirection);
+        {
+            const offset = 0;
+            const type = Program.gl.UNSIGNED_SHORT;
+            const vertexCount = buffers.indices.length;
+            //按连续的三角形方式以此按点绘制
+            Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
+        }
+    }
+
+    function drawTexture(Program, buffers, modelMatrix, viewMatrix, projectionMatrix, num) {
+        //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.position);
+            Program.gl.vertexAttribPointer(
+                Program.Texture_programInfo.attribLocations.vertexPosition,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.Texture_programInfo.attribLocations.vertexPosition);
+        }
+        //为webGL设置从缓冲区抽取法向量数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.normal);
+            Program.gl.vertexAttribPointer(
+                Program.Texture_programInfo.attribLocations.normal,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.Texture_programInfo.attribLocations.normal);
+        }
+        //为webGL设置从缓冲区抽取颜色数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 4;//每次取出4个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.color);
+            Program.gl.vertexAttribPointer(
+                Program.Texture_programInfo.attribLocations.vertexColor,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.Texture_programInfo.attribLocations.vertexColor);
+        }
+        //为webGL设置从缓冲区抽取纹理数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 2;//每次取出2个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.TextCoord);
+            Program.gl.vertexAttribPointer(
+                Program.Texture_programInfo.attribLocations.TextCoord,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.Texture_programInfo.attribLocations.TextCoord);
+        }
+        // Tell WebGL which indices to use to index the vertices
+        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+
+        //webGL使用此程序进行绘制
+        Program.gl.useProgram(Program.Texture_programInfo.program);
+
+        // 设置着色器的uniform型变量
+        Program.gl.uniformMatrix4fv(
+            Program.Texture_programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.Texture_programInfo.uniformLocations.viewMatrix,
+            false,
+            viewMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.Texture_programInfo.uniformLocations.modelMatrix,
+            false,
+            modelMatrix);
+        const reverseModelMat = mat4.create();
+        mat4.invert(reverseModelMat, modelMatrix);
+        mat4.transpose(reverseModelMat, reverseModelMat);
+        Program.gl.uniformMatrix4fv(
+            Program.Texture_programInfo.uniformLocations.reverseModelMatrix,
+            false,
+            reverseModelMat);
+        Program.gl.uniform3fv(
+            Program.Texture_programInfo.uniformLocations.lightColor,
+            lightColor);
+        Program.gl.uniform3fv(
+            Program.Texture_programInfo.uniformLocations.lightDirection,
+            lightDirection);
+        Program.gl.uniform3fv(
+            Program.Texture_programInfo.uniformLocations.eyePosition,
+            eye);
+        Program.gl.uniform3fv(
+            Program.Texture_programInfo.uniformLocations.ambient,
+            ambientLight);
+        Program.gl.uniform1i(
+            Program.Texture_programInfo.uniformLocations.Sampler,
+            num);
         {
             const offset = 0;
             const type = Program.gl.UNSIGNED_SHORT;
@@ -177,25 +316,22 @@ window.onload = function () {
 
     //设置模型矩阵，translation为模型的平移，rotation为模型的旋转。modelrotation，modelrotation用于模型的方向修正
     function setModelMatrix(translation, rotation, modelrotation) {
-
-
         const modelMatrix = mat4.create();
-
+        mat4.translate(modelMatrix,     // destination matrix
+            modelMatrix,     // matrix to translate
+            translation);  // amount to translate
         mat4.rotate(modelMatrix,  // destination matrix
             modelMatrix,  // matrix to rotate
             rotation.rad,     // amount to rotate in radians
             rotation.axis);       // axis to rotate around (Z)
-        mat4.translate(modelMatrix,     // destination matrix
-            modelMatrix,     // matrix to translate
-            translation);  // amount to translate
-        if(modelrotation)
+        if (modelrotation)
             mat4.rotate(modelMatrix,  // destination matrix
                 modelMatrix,  // matrix to rotate
                 modelrotation.rad,     // amount to rotate in radians
                 modelrotation.axis);       // axis to rotate around (Z)
-
         return modelMatrix;
     }
+
     //设置视角矩阵，根据视点，目标点和上方向确定视角矩阵
     function setViewMatrix() {
         //设置view坐标系
@@ -203,6 +339,7 @@ window.onload = function () {
         mat4.lookAt(ViewMatrix, eye, target, up);
         return ViewMatrix;
     }
+
     function setProjectionMatrix(gl) {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
@@ -246,24 +383,25 @@ window.onload = function () {
         var color2 = [80 / 255.0, 24 / 255.0, 21 / 255.0, 1.0];//Black
         var color3 = [60 / 255.0, 107 / 255.0, 176 / 255.0, 1.0];//Blue
         var color4 = [239 / 255.0, 169 / 255.0, 13 / 255.0, 1.0];//Yellow
+        var text_filepath1 = '../res/sun.jpg';
+        var text_filepath2 = '../res/mercury.jpg';
+        var text_filepath3 = '../res/earth.jpg';
+        var text_filepath4 = '../res/moon.jpg';
         const Cubebuffer = initOneCube(Program, center, size, color);
-        const ballbuffer1 = initOneBall(Program, center1, radius1, color1);
-        const ballbuffer2 = initOneBall(Program, center2, radius2, color2);
-        const ballbuffer3 = initOneBall(Program, center3, radius3, color3);
-        const ballbuffer4 = initOneBall(Program, center4, radius4, color4);
+        const ballbuffer1 = initTextureBall(Program, center1, radius1, color1);
+        const ballbuffer2 = initTextureBall(Program, center2, radius2, color2);
+        const ballbuffer3 = initTextureBall(Program, center3, radius3, color3);
+        const ballbuffer4 = initTextureBall(Program, center4, radius4, color4);
         const skyboxbuffer = initSkybox(Program);
 
-        // LoadObjFile(Program.gl, '../obj/cube.obj', objbuffers, 3, false, 0);
-
         LoadObjFile(Program.gl, '../obj/plane_min/obj.obj', objbuffers, 0.003, color1, false);
-        //LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, color3, false);
+        LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, color3, false);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
-        Program.gl.clearColor(0.0, 0.0, 0.0, 1.0);  // Clear to black, fully opaque
-        Program.gl.clearDepth(1.0);                 // Clear everything
-        Program.gl.enable(Program.gl.DEPTH_TEST);           // Enable depth testing
-        Program.gl.depthFunc(Program.gl.LEQUAL);            // Near things obscure far things
-        Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);
+        initTextures(Program, Program.gl, text_filepath1, 0);
+        initTextures(Program, Program.gl, text_filepath2, 1);
+        initTextures(Program, Program.gl, text_filepath3, 2);
+        initTextures(Program, Program.gl, text_filepath4, 3);
 
         var then = 0;
         // Draw the scene repeatedly
@@ -275,27 +413,25 @@ window.onload = function () {
             const viewMatrix = setViewMatrix();
 
             // const modelMatrix = setModelMatrix(translation, rotation);
-            const modelMatrix1 = setModelMatrix(translation, rotation);
-            const modelMatrix2 = setModelMatrix(translation, rotation);
-            const modelMatrix3 = setModelMatrix(translation, rotation);
-            const modelMatrix4 = setModelMatrix(translation, rotation);
-            const modelMatrix5 = setModelMatrix([0, 0, 0], rotation, modelrotation);
-            //const modelMatrix6 = setModelMatrix([0, 0.5, 0], rotation);
+            const modelMatrix1 = setModelMatrix(nochange_translation, nochange_rotation);
+            const modelMatrix2 = setModelMatrix(nochange_translation, nochange_rotation);
+            const modelMatrix3 = setModelMatrix(nochange_translation, nochange_rotation);
+            const modelMatrix4 = setModelMatrix(nochange_translation, nochange_rotation);
+            const modelMatrix5 = setModelMatrix(translation, rotation, modelrotation);
+            const modelMatrix6 = setModelMatrix(nochange_translation, nochange_rotation);
 
             requestAnimationFrame(render);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
             drawSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
-            draw(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix);
-            draw(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix);
-            draw(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix);
-            draw(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix);
+            drawTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
+            drawTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
+            drawTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
+            drawTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
             if (objbuffers[0])
                 draw(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix);
-            // if (objbuffers[1])
-            //     draw(Program, objbuffers[1], modelMatrix6, viewMatrix, projectionMatrix);
-            translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
-            // eye[2] -= deltaTime * speed;
-            // target[2] -= deltaTime * speed;
+            if (objbuffers[1])
+                draw(Program, objbuffers[1], modelMatrix6, viewMatrix, projectionMatrix);
+            nochange_translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
         }
         requestAnimationFrame(render);
     }

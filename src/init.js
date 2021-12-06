@@ -15,6 +15,8 @@ function initProgram() {
     canvas.onmouseout = handleMouseOut;
     document.onkeydown = handleKeyDown;
     document.onkeyup = handleKeyUp;
+
+    //定义天空盒顶点着色器
     const sky_vsSource = `
     attribute vec4 aTextureCoord;   //纹理坐标
 
@@ -29,6 +31,7 @@ function initProgram() {
       vTextureCoord = aTextureCoord.xyz;
     }
   `;
+    //定义天空盒片段着色器
     const sky_fsSource = `
     varying highp vec3 vTextureCoord;
     
@@ -36,6 +39,64 @@ function initProgram() {
 
     void main() {
       gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
+    }
+  `;
+    //定义纹理顶点着色器
+    const Texture_vsSource = `
+    attribute vec4 aVertexColor; //颜色属性，用四维向量表示（第四维无意义，用于计算）
+    attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
+    attribute vec4 aNormal; //法向量
+    attribute vec2 aTextCoord; //纹理
+
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+    uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+    uniform mat4 uReverseModelMatrix; //模型矩阵的逆转置
+
+    varying vec4 v_Color;       //颜色varying类变量，用于向片段着色器传递颜色属性
+    varying vec3 v_Normal;
+    varying vec4 v_Position;
+    varying vec2 v_TextCoord;
+
+    void main() {
+        gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;  //点坐标位置
+        //法向量进行归一化
+        v_Normal = normalize(vec3(uReverseModelMatrix * aNormal));
+        //变化后的坐标 -> 世界坐标
+        v_Position = uModelMatrix * aVertexPosition;
+        v_TextCoord = aTextCoord;
+        v_Color = aVertexColor;        //点的颜色
+    }
+  `;
+
+    //定义纹理片段着色器
+    const Texture_fsSource = `
+    precision mediump float;
+    uniform sampler2D uSampler;
+    uniform vec3 uLightColor; //光颜色强度
+    uniform vec3 uLightDirection; //光线方向
+    uniform vec3 uEyePosition;  //观察位置
+    uniform vec3 uAmbientLight; // 环境光
+    
+    varying vec3 v_Normal;
+    varying vec4 v_Position;
+    varying vec4 v_Color;
+    varying vec2 v_TextCoord;
+    
+    void main() {
+        //纹理作为颜色传入
+        vec4 v_Color=texture2D(uSampler,v_TextCoord);
+        //视线方向并归一化
+        vec3 viewDirection = normalize(uEyePosition - vec3(v_Position));
+        //光线方向并归一化
+        vec3 lightDirection = normalize(uLightDirection);
+        //计算cos入射角 当角度大于90 说明光照在背面 赋值为0
+        float nDotLight = max(dot(lightDirection, v_Normal), 0.0);
+        //计算漫反射光颜色
+        vec3 diffuse = uLightColor * v_Color.rgb * nDotLight;
+        // 环境反射光颜色
+        vec3 ambient = uAmbientLight * v_Color.rgb;
+        gl_FragColor = vec4(diffuse + ambient, v_Color.a);
     }
   `;
     //定义顶点着色器
@@ -67,7 +128,7 @@ function initProgram() {
     precision mediump float;
 
     uniform vec3 uLightColor; //光颜色强度
-    uniform vec3 uLightPosition; //光源位置
+    uniform vec3 uLightDirection; //光源位置
     uniform vec3 uAmbientLight; // 环境光
 
     varying lowp vec4 vColor;
@@ -75,14 +136,13 @@ function initProgram() {
     varying lowp vec4 vPosition;
     
     void main() {
-      vec3 lightDirection = normalize(uLightPosition - vec3(vPosition));
+      vec3 lightDirection = normalize(uLightDirection);
       //计算cos入射角.当角度大于90,说明光照在背面,赋值为0
       float cosLight = max(dot(lightDirection, vNomral), 0.0);
       //计算漫反射反射光颜色
       vec3 diffuse = normalize(uLightColor) * vColor.rgb * cosLight;
       // 环境反射光颜色
       vec3 ambient = uAmbientLight * vColor.rgb;
-
       gl_FragColor = vec4(diffuse + ambient, vColor.a);
     }
   `;
@@ -90,6 +150,8 @@ function initProgram() {
     //初始化着色器程序
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
     const sky_shaderProgram = initShaderProgram(gl, sky_vsSource, sky_fsSource);
+    const Texture_shaderProgram = initShaderProgram(gl, Texture_vsSource, Texture_fsSource);
+
     //收集着色器程序会用到的所有信息
     const programInfo = {
         program: shaderProgram,
@@ -97,7 +159,7 @@ function initProgram() {
             vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
             vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
             vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
-            
+
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
@@ -105,14 +167,14 @@ function initProgram() {
             modelMatrix: gl.getUniformLocation(shaderProgram, 'uModelMatrix'),
             normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
             uLightColor: gl.getUniformLocation(shaderProgram, 'uLightColor'),
-            uLightPosition: gl.getUniformLocation(shaderProgram, 'uLightPosition'),
+            uLightDirection: gl.getUniformLocation(shaderProgram, 'uLightDirection'),
             uAmbientLight: gl.getUniformLocation(shaderProgram, 'uAmbientLight'),
         },
     };
     const sky_programInfo = {
         program: sky_shaderProgram,
         attribLocations: {
-            textureCoord: gl.getAttribLocation(sky_shaderProgram, 'aTextureCoord'),              
+            textureCoord: gl.getAttribLocation(sky_shaderProgram, 'aTextureCoord'),
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(sky_shaderProgram, 'uProjectionMatrix'),
@@ -120,6 +182,27 @@ function initProgram() {
             uSampler: gl.getUniformLocation(sky_shaderProgram, 'uSampler'),
         },
     };
+    const Texture_programInfo = {
+        program: Texture_shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(Texture_shaderProgram, 'aVertexPosition'),
+            vertexColor: gl.getAttribLocation(Texture_shaderProgram, 'aVertexColor'),
+            normal: gl.getAttribLocation(Texture_shaderProgram, 'aNormal'),
+            TextCoord: gl.getAttribLocation(Texture_shaderProgram, 'aTextCoord'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(Texture_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(Texture_shaderProgram, 'uViewMatrix'),
+            modelMatrix: gl.getUniformLocation(Texture_shaderProgram, 'uModelMatrix'),
+            reverseModelMatrix: gl.getUniformLocation(Texture_shaderProgram, 'uReverseModelMatrix'),
+            Sampler: gl.getUniformLocation(Texture_shaderProgram, 'uSampler'),
+            lightColor: gl.getUniformLocation(Texture_shaderProgram, 'uLightColor'),
+            eyePosition: gl.getUniformLocation(Texture_shaderProgram, 'uEyePosition'),
+            lightDirection: gl.getUniformLocation(Texture_shaderProgram, 'uLightDirection'),
+            ambient: gl.getUniformLocation(Texture_shaderProgram, 'uAmbientLight'),
+        },
+    };
+
     gl.clearColor(0.5, 0.5, 0.5, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -131,6 +214,7 @@ function initProgram() {
         gl: gl,
         programInfo: programInfo,
         sky_programInfo: sky_programInfo,
+        Texture_programInfo: Texture_programInfo,
     }
 }
 
@@ -199,13 +283,13 @@ function handleMouseMove(event) {
         viewRotationMatrix,
         rady,
         rotation_y);
-    
-        //对视点和up向量进行旋转变换
+
+    //对视点和up向量进行旋转变换
     vec3.transformMat4(vec3_eye, vec3_eye, viewRotationMatrix);
     vec3.transformMat4(vec3_up, vec3_up, viewRotationMatrix);
 
-    eye[0] = vec3_eye[0];eye[1] = vec3_eye[1];eye[2] = vec3_eye[2];
-    up[0] = vec3_up[0];up[1] = vec3_up[1];up[2] = vec3_up[2];
+    eye[0] = vec3_eye[0]; eye[1] = vec3_eye[1]; eye[2] = vec3_eye[2];
+    up[0] = vec3_up[0]; up[1] = vec3_up[1]; up[2] = vec3_up[2];
     //mat4.lookAt(viewMatrix, eye, target, up);
     lastMouseX = newX;
     lastMouseY = newY;
@@ -239,53 +323,67 @@ function handleKeyUp(event) {
 
 
 function initBuffers(gl, positions, colors, indices, normals) {
-    //初始化一个面的buffer
-    // 1.顶点缓冲区
-    // Create a buffer for the cube's vertex positions.
+    //顶点缓冲区
     const positionBuffer = gl.createBuffer();
-    // Select the positionBuffer as the one to apply buffer
-    // operations to from here out
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    // Now pass the list of positions into WebGL to build the
-    // shape. We do this by creating a Float32Array from the
-    // JavaScript array, then use it to fill the current buffer.
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
-
-    // 2.创建纹理坐标到立方体各个面的顶点的映射关系
-    // const textureCoordBuffer = gl.createBuffer();   //创建一个GL缓存区保存每个面的纹理坐标信息
-    // gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer); //把这个缓存区绑定到GL
-    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates),
-    //     gl.STATIC_DRAW);    //把这个数组里的数据都写到GL缓存区
     //为颜色创建缓冲区
     const colorBuffer = gl.createBuffer();
-    //绑定缓冲区
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    //将colors数据传入webGL缓冲区
-    gl.bufferData(gl.ARRAY_BUFFER,
-        new Float32Array(colors),
-        gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
 
-    // 3.索引缓冲区
-    // Build the element array buffer; this specifies the indices
-    // into the vertex arrays for each face's vertices.
+    //索引缓冲区
     const indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    // Now send the element array to GL
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(indices), gl.STATIC_DRAW);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
+    //法向量缓冲区
     const normalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, normalBuffer);
-    // Now send the element array to GL
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(normals), gl.STATIC_DRAW);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
 
     return {
         position: positionBuffer,
         color: colorBuffer,
         index: indexBuffer,
         normal: normalBuffer,
+        indices: indices,
+    }
+}
+
+function initTextBuffers(gl, positions, colors, indices, normals, TextCoord) {
+    //顶点缓冲区
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+    //为颜色创建缓冲区
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+    //索引缓冲区
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+    //法向量缓冲区
+    const normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+
+    //纹理缓冲区
+    const TextureBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, TextureBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TextCoord), gl.STATIC_DRAW);
+
+    return {
+        position: positionBuffer,
+        color: colorBuffer,
+        index: indexBuffer,
+        normal: normalBuffer,
+        TextCoord: TextureBuffer,
         indices: indices,
     }
 }
@@ -316,78 +414,71 @@ function loadShader(gl, type, source) {
 function initSkybox(Program) {
     var scale = 50;
     const positions = [
-            // positions          
-            -1.0 * scale,  1.0 * scale, -1.0 * scale,
-            -1.0 * scale, -1.0 * scale, -1.0 * scale,
-             1.0 * scale, -1.0 * scale, -1.0 * scale,
-             1.0 * scale, -1.0 * scale, -1.0 * scale,
-             1.0 * scale,  1.0 * scale, -1.0 * scale,
-            -1.0 * scale,  1.0 * scale, -1.0 * scale,
-        
-            -1.0 * scale, -1.0 * scale,  1.0 * scale,
-            -1.0 * scale, -1.0 * scale, -1.0 * scale,
-            -1.0 * scale,  1.0 * scale, -1.0 * scale,
-            -1.0 * scale,  1.0 * scale, -1.0 * scale,
-            -1.0 * scale,  1.0 * scale,  1.0 * scale,
-            -1.0 * scale, -1.0 * scale,  1.0 * scale,
-        
-             1.0 * scale, -1.0 * scale, -1.0 * scale,
-             1.0 * scale, -1.0 * scale,  1.0 * scale,
-             1.0 * scale,  1.0 * scale,  1.0 * scale,
-             1.0 * scale,  1.0 * scale,  1.0 * scale,
-             1.0 * scale,  1.0 * scale, -1.0 * scale,
-             1.0 * scale, -1.0 * scale, -1.0 * scale,
-        
-            -1.0 * scale, -1.0 * scale,  1.0 * scale,
-            -1.0 * scale,  1.0 * scale,  1.0 * scale,
-             1.0 * scale,  1.0 * scale,  1.0 * scale,
-             1.0 * scale,  1.0 * scale,  1.0 * scale,
-             1.0 * scale, -1.0 * scale,  1.0 * scale,
-            -1.0 * scale, -1.0 * scale,  1.0 * scale,
-        
-            -1.0 * scale,  1.0 * scale, -1.0 * scale,
-             1.0 * scale,  1.0 * scale, -1.0 * scale,
-             1.0 * scale,  1.0 * scale,  1.0 * scale,
-             1.0 * scale,  1.0 * scale,  1.0 * scale,
-            -1.0 * scale,  1.0 * scale,  1.0 * scale,
-            -1.0 * scale,  1.0 * scale, -1.0 * scale,
-        
-            -1.0 * scale, -1.0 * scale, -1.0 * scale,
-            -1.0 * scale, -1.0 * scale,  1.0 * scale,
-             1.0 * scale, -1.0 * scale, -1.0 * scale,
-             1.0 * scale, -1.0 * scale, -1.0 * scale,
-            -1.0 * scale, -1.0 * scale,  1.0 * scale,
-             1.0 * scale, -1.0 * scale,  1.0 * scale
+        // positions          
+        -1.0 * scale, 1.0 * scale, -1.0 * scale,
+        -1.0 * scale, -1.0 * scale, -1.0 * scale,
+        1.0 * scale, -1.0 * scale, -1.0 * scale,
+        1.0 * scale, -1.0 * scale, -1.0 * scale,
+        1.0 * scale, 1.0 * scale, -1.0 * scale,
+        -1.0 * scale, 1.0 * scale, -1.0 * scale,
+
+        -1.0 * scale, -1.0 * scale, 1.0 * scale,
+        -1.0 * scale, -1.0 * scale, -1.0 * scale,
+        -1.0 * scale, 1.0 * scale, -1.0 * scale,
+        -1.0 * scale, 1.0 * scale, -1.0 * scale,
+        -1.0 * scale, 1.0 * scale, 1.0 * scale,
+        -1.0 * scale, -1.0 * scale, 1.0 * scale,
+
+        1.0 * scale, -1.0 * scale, -1.0 * scale,
+        1.0 * scale, -1.0 * scale, 1.0 * scale,
+        1.0 * scale, 1.0 * scale, 1.0 * scale,
+        1.0 * scale, 1.0 * scale, 1.0 * scale,
+        1.0 * scale, 1.0 * scale, -1.0 * scale,
+        1.0 * scale, -1.0 * scale, -1.0 * scale,
+
+        -1.0 * scale, -1.0 * scale, 1.0 * scale,
+        -1.0 * scale, 1.0 * scale, 1.0 * scale,
+        1.0 * scale, 1.0 * scale, 1.0 * scale,
+        1.0 * scale, 1.0 * scale, 1.0 * scale,
+        1.0 * scale, -1.0 * scale, 1.0 * scale,
+        -1.0 * scale, -1.0 * scale, 1.0 * scale,
+
+        -1.0 * scale, 1.0 * scale, -1.0 * scale,
+        1.0 * scale, 1.0 * scale, -1.0 * scale,
+        1.0 * scale, 1.0 * scale, 1.0 * scale,
+        1.0 * scale, 1.0 * scale, 1.0 * scale,
+        -1.0 * scale, 1.0 * scale, 1.0 * scale,
+        -1.0 * scale, 1.0 * scale, -1.0 * scale,
+
+        -1.0 * scale, -1.0 * scale, -1.0 * scale,
+        -1.0 * scale, -1.0 * scale, 1.0 * scale,
+        1.0 * scale, -1.0 * scale, -1.0 * scale,
+        1.0 * scale, -1.0 * scale, -1.0 * scale,
+        -1.0 * scale, -1.0 * scale, 1.0 * scale,
+        1.0 * scale, -1.0 * scale, 1.0 * scale
     ];
-  
+
     //在positions中所有点信息已经列齐，index只需按序对应即可
     var indices = new Array();
-    for(var i = 0; i < 36; i++)
+    for (var i = 0; i < 36; i++)
         indices.push(i);
-  
+
     const textureCoordBuffer = Program.gl.createBuffer();
-    // Select the positionBuffer as the one to apply buffer
-    // operations to from here out
     Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, textureCoordBuffer);
-    // Now pass the list of positions into WebGL to build the
-    // shape. We do this by creating a Float32Array from the
-    // JavaScript array, then use it to fill the current buffer.
     Program.gl.bufferData(Program.gl.ARRAY_BUFFER, new Float32Array(positions), Program.gl.STATIC_DRAW);
-    
+
     const indexBuffer = Program.gl.createBuffer();
     Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-    // Now send the element array to GL
-    Program.gl.bufferData(Program.gl.ELEMENT_ARRAY_BUFFER,
-        new Uint16Array(indices), Program.gl.STATIC_DRAW);
-  
+    Program.gl.bufferData(Program.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), Program.gl.STATIC_DRAW);
+
     return {
         textureCoord: textureCoordBuffer,
         index: indexBuffer,
     }
-    
-  }
 
-  function initOneCube(Program, center, size, color) {
+}
+
+function initOneCube(Program, center, size, color) {
     const positions = [];
     const colors = [];
     const indices = [
@@ -426,6 +517,7 @@ function initSkybox(Program) {
     const buffers = initBuffers(Program.gl, positions, colors, indices);
     return buffers;
 }
+
 function initOneBall(Program, center, radius, color) {
     var positions = new Array();
     var normals = new Array();
@@ -466,5 +558,53 @@ function initOneBall(Program, center, radius, color) {
         }
     }
     const buffers = initBuffers(Program.gl, positions, colors, indices);
+    return buffers;
+}
+
+function initTextureBall(Program, center, radius, color) {
+    var positions = new Array();
+    for (i = 0; i <= 180; i += 1) {//fai
+        for (j = 0; j <= 360; j += 1) {//theata
+            positions.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180) + center[0]);
+            positions.push(radius * Math.sin(Math.PI * i / 180) * Math.sin(Math.PI * j / 180) + center[1]);
+            positions.push(radius * Math.cos(Math.PI * i / 180) + center[2]);
+        }
+    }
+    var colors = new Array();
+    for (i = 0; i <= 180; i += 1) {
+        for (j = 0; j <= 360; j += 1) {
+            colors.push(color[0]);  //R
+            colors.push(color[1]);  //G
+            colors.push(color[2]);  //B
+            colors.push(color[3]);  //Alpha
+        }
+    }
+    var indices = new Array();
+    for (i = 0; i < 180; i += 1) {//fai
+        for (j = 0; j < 360; j += 1) {//theata
+            indices.push(360 * i + j);
+            indices.push(360 * i + (j + 1));
+            indices.push(360 * (i + 1) + j);
+            indices.push(360 * (i + 1) + j + 1);
+            indices.push(360 * i + (j + 1));
+            indices.push(360 * (i + 1) + j);
+        }
+    }
+    var normals = new Array();
+    for (i = 0; i <= 180; i += 1) {//fai
+        for (j = 0; j <= 360; j += 1) {//theata
+            normals.push(radius * Math.sin(Math.PI * i / 180) * Math.cos(Math.PI * j / 180));
+            normals.push(radius * Math.sin(Math.PI * i / 180) * Math.sin(Math.PI * j / 180));
+            normals.push(radius * Math.cos(Math.PI * i / 180));
+        }
+    }
+    var TextCoord = new Array();
+    for (i = 0; i <= 180; i += 1) {//fai
+        for (j = 0; j <= 360; j += 1) {//theata
+            TextCoord.push(i / 180.0);
+            TextCoord.push(j / 360.0);
+        }
+    }
+    const buffers = initTextBuffers(Program.gl, positions, colors, indices, normals, TextCoord);
     return buffers;
 }
