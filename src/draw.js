@@ -8,7 +8,7 @@ var ch = 0.0;
 
 var speed = 1;
 var del = 0.1;
-var translation = [0, 0, -6];
+var translation = [0, 0, 0];
 var nochange_translation = [0, 0, -6];
 
 var Rotation = function (rad, axis) {
@@ -16,8 +16,11 @@ var Rotation = function (rad, axis) {
     this.axis = axis;
 }
 var rotation = new Rotation(0, [0, 0, 1]);
-var nochange_rotation = new Rotation(0, [0, 0, 1]);
-var modelrotation = new Rotation(Math.PI, [0, 1, 0]);
+var nochange_rotation = new Rotation(0, [0, 1, 0]);
+
+var modelxrotation = new Rotation(Math.PI / 2, [1, 0, 0]);
+var modelyrotation = new Rotation(Math.PI, [0, 1, 0]);
+var modelzrotation = new Rotation(0, [0, 0, 1]);
 
 window.onload = function () {
     var lightColor = vec3.fromValues(1.0, 1.0, 1.0);
@@ -34,11 +37,9 @@ window.onload = function () {
     }
 
     function loadTexture(Program, gl, texture, image, index) {
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
-        if (index == 0) gl.activeTexture(gl.TEXTURE0);
-        if (index == 1) gl.activeTexture(gl.TEXTURE1);
-        if (index == 2) gl.activeTexture(gl.TEXTURE2);
-        if (index == 3) gl.activeTexture(gl.TEXTURE3);
+        //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+        gl.activeTexture(gl.TEXTURE0 + index);
+
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
@@ -315,7 +316,7 @@ window.onload = function () {
     }
 
     //设置模型矩阵，translation为模型的平移，rotation为模型的旋转。modelrotation，modelrotation用于模型的方向修正
-    function setModelMatrix(translation, rotation, modelrotation) {
+    function setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation,) {
         const modelMatrix = mat4.create();
         mat4.translate(modelMatrix,     // destination matrix
             modelMatrix,     // matrix to translate
@@ -324,11 +325,21 @@ window.onload = function () {
             modelMatrix,  // matrix to rotate
             rotation.rad,     // amount to rotate in radians
             rotation.axis);       // axis to rotate around (Z)
-        if (modelrotation)
+        if (modelxrotation)
             mat4.rotate(modelMatrix,  // destination matrix
                 modelMatrix,  // matrix to rotate
-                modelrotation.rad,     // amount to rotate in radians
-                modelrotation.axis);       // axis to rotate around (Z)
+                modelxrotation.rad,     // amount to rotate in radians
+                modelxrotation.axis);       // axis to rotate around (Z)
+        if (modelyrotation)
+            mat4.rotate(modelMatrix,  // destination matrix
+                modelMatrix,  // matrix to rotate
+                modelyrotation.rad,     // amount to rotate in radians
+                modelyrotation.axis);       // axis to rotate around (Z)     
+        if (modelzrotation)
+            mat4.rotate(modelMatrix,  // destination matrix
+                modelMatrix,  // matrix to rotate
+                modelzrotation.rad,     // amount to rotate in radians
+                modelzrotation.axis);       // axis to rotate around (Z)           
         return modelMatrix;
     }
 
@@ -387,6 +398,7 @@ window.onload = function () {
         var text_filepath2 = '../res/mercury.jpg';
         var text_filepath3 = '../res/earth.jpg';
         var text_filepath4 = '../res/moon.jpg';
+        var text_filepath5 = '../texture/plane.jpg';
         const Cubebuffer = initOneCube(Program, center, size, color);
         const ballbuffer1 = initTextureBall(Program, center1, radius1, color1);
         const ballbuffer2 = initTextureBall(Program, center2, radius2, color2);
@@ -394,15 +406,15 @@ window.onload = function () {
         const ballbuffer4 = initTextureBall(Program, center4, radius4, color4);
         const skyboxbuffer = initSkybox(Program);
 
-        LoadObjFile(Program.gl, '../obj/plane_min/obj.obj', objbuffers, 0.003, color1, false);
-        LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, color3, false);
+        LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objbuffers, 0.8, false);
+        //LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, false);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
         initTextures(Program, Program.gl, text_filepath1, 0);
         initTextures(Program, Program.gl, text_filepath2, 1);
         initTextures(Program, Program.gl, text_filepath3, 2);
         initTextures(Program, Program.gl, text_filepath4, 3);
-
+        initTextures(Program, Program.gl, text_filepath5, 4);
         var then = 0;
         // Draw the scene repeatedly
         function render(now) {
@@ -417,7 +429,7 @@ window.onload = function () {
             const modelMatrix2 = setModelMatrix(nochange_translation, nochange_rotation);
             const modelMatrix3 = setModelMatrix(nochange_translation, nochange_rotation);
             const modelMatrix4 = setModelMatrix(nochange_translation, nochange_rotation);
-            const modelMatrix5 = setModelMatrix(translation, rotation, modelrotation);
+            const modelMatrix5 = setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation);
             const modelMatrix6 = setModelMatrix(nochange_translation, nochange_rotation);
 
             requestAnimationFrame(render);
@@ -428,9 +440,9 @@ window.onload = function () {
             drawTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
             drawTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
             if (objbuffers[0])
-                draw(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix);
-            if (objbuffers[1])
-                draw(Program, objbuffers[1], modelMatrix6, viewMatrix, projectionMatrix);
+                drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
+            // if (objbuffers[1])
+            //     draw(Program, objbuffers[1], modelMatrix6, viewMatrix, projectionMatrix);
             nochange_translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
         }
         requestAnimationFrame(render);
