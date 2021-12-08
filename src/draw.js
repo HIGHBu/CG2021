@@ -31,19 +31,28 @@ window.onload = function () {
         var texture = gl.createTexture(); // Create texture
         // var Sampler = Program.programInfo2.uniformLocations.Sampler;
         var image = new Image(); // Create a image
-        image.onload = function () { loadTexture(Program, gl, texture, image, index); };
+        image.onload = function () { loadTexture(gl, texture, image, index); };
         image.src = filepath;
         return true;
     }
 
-    function loadTexture(Program, gl, texture, image, index) {
+    function loadTexture(gl, texture, image, index) {
         //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
         gl.activeTexture(gl.TEXTURE0 + index);
 
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
-
+        // Check if the image is a power of 2 in both dimensions.
+        if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+            // Yes, it's a power of 2. Generate mips.
+            gl.generateMipmap(gl.TEXTURE_2D);
+        }
+        else {
+            // No, it's not a power of 2. Turn of mips and set wrapping to clamp to edge
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        }
     }
 
     //天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
