@@ -92,7 +92,7 @@ var OBJDoc = function(fileName) {
   this.textureCoords = new Array(0);
 }
 
-async function onloadMTLFile(sp, objdoc){
+async function onloadMTLFile(sp, objdoc, mtlDocArray){
               //当第三方api提供的是异步方法时 这里用setTimeout模拟
                 var path = getPath(objdoc.fileName);
                 var mtl = new MTLDoc();   // Create MTL instance
@@ -102,6 +102,7 @@ async function onloadMTLFile(sp, objdoc){
                   if (request.readyState == 4) {
                     if (request.status != 404) {
                       loadMTLFile(request.responseText, mtl);
+                      mtlDocArray.push(mtl);
                     }else{
                       mtl.complete = true;
                     }
@@ -112,7 +113,7 @@ async function onloadMTLFile(sp, objdoc){
 }
 
 //fileString: obj文件的内容
-OBJDoc.prototype.parse = function(fileString, scale, inverse){
+OBJDoc.prototype.parse = function(fileString, scale, inverse, mtlDocArray){
   var lines = fileString.split('\n');
   lines.push(null);
   var index = 0;
@@ -137,7 +138,7 @@ OBJDoc.prototype.parse = function(fileString, scale, inverse){
           case 'mtllib':
 
               // Send the request
-              onloadMTLFile(sp, this).then(res => {
+              onloadMTLFile(sp, this, mtlDocArray).then(res => {
                 console.log("mtl load complete.");
               })
               continue;
@@ -301,11 +302,11 @@ this.texture = null;
 
 var Material = function(name, ka, kd, ks, ke, ni, d, illum){
 this.name = name;
-this.ka = ka;
-this.kd = kd;
-this.ks = ks;
-this.ke = ke;
-this.ni = ni;
+this.Ka = ka;
+this.Kd = kd;
+this.Ks = ks;
+this.Ke = ke;
+this.Ki = ni;
 this.d = d;
 this.illum = illum;
 }
@@ -317,55 +318,19 @@ this.illum = illum;
 
 // Read a file
 //buffers为全局变量，用于返回构造的buffer，scale为缩放程度，inverse用于指明法线方向是否与模型相反，index为buffer的索引位置
-function LoadObjFile(gl, fileName, buffers, scale, inverse) {
+function LoadObjFile(gl, fileName, objDocArray, mtlDocArray, scale, inverse) {
   var request = new XMLHttpRequest();
   request.onreadystatechange = function() {
     if (request.readyState === 4 && request.status !== 404) {
       //objDocs为解析出来的obj模型信息对象
       var objDocs = new OBJDoc(fileName);  // Create a OBJDoc object
-      var positions = new Array(0);
-      var indices = new Array(0);
-      var normals = new Array(0);
-      var textureCoords = new Array(0);
-      var colors = new Array(0);
 
-      var result = objDocs.parse(request.responseText, scale, inverse); // Parse the file
+
+      var result = objDocs.parse(request.responseText, scale, inverse, mtlDocArray); // Parse the file
+      objDocArray.push(objDocs);
       //将obj模型的信息压入positions,colors,indices,normals, 并用其构造buffer
       // for(var i = 0; i < objDocs.vertices.length; i++)
       //     positions.push(objDocs.vertices[i].x, objDocs.vertices[i].y, objDocs.vertices[i].z);
-      var numIndices = 0;
-      for(var i = 0; i < objDocs.objects.length; i++){
-          numIndices += objDocs.objects[i].numIndices;
-          //每一个objects[i].numIndices 是它的所有的face的顶点数加起来
-      }
-      // for(var i = 0; i < objDocs.textureCoords.length; i++)
-      //     textureCoords.push(objDocs.textureCoords[i].x, objDocs.textureCoords[i].y);
-      var index_indices = 0;
-      for(var i = 0; i < objDocs.objects.length; i++){
-          var currentObject = objDocs.objects[i];
-          for(var j = 0; j < currentObject.faces.length; j++){
-              var currentFace = currentObject.faces[j];
-              for(var k = 0; k < currentFace.vIndices.length; k++){
-                colors.push(0.8, 0.8, 0.8, 1);
-                indices.push(index_indices % numIndices);
-                var vIdx = currentFace.vIndices[k];
-                var tIdx = currentFace.tIndices[k];
-                var nIdx = currentFace.nIndices[k];
-                positions.push(objDocs.vertices[vIdx].x, objDocs.vertices[vIdx].y, objDocs.vertices[vIdx].z);
-                if(tIdx >= 0)
-                    textureCoords.push(objDocs.textureCoords[tIdx].x, objDocs.textureCoords[tIdx].y);
-                else
-                    textureCoords.push(0, 0);
-                if(nIdx >= 0)
-                    normals.push(objDocs.normals[nIdx].x, objDocs.normals[nIdx].y, objDocs.normals[nIdx].z);
-                else
-                    normals.push(currentFace.normal[0], currentFace.normal[1], currentFace.normal[2]);  
-                index_indices++;
-              }
-          }
-      }
-      temp = initTextBuffers(gl, positions, colors, indices, normals, textureCoords);
-      buffers.push(temp);
     }
   }
   request.open('GET', fileName, true); // Create a request to acquire the file

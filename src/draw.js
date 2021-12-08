@@ -1,4 +1,6 @@
 var objbuffers = [];
+var objDocArray = [];
+var mtlDocArray = [];
 
 var eye = [0, 0, 6];
 var target = [0, 0, 0];
@@ -415,7 +417,7 @@ window.onload = function () {
         const ballbuffer4 = initTextureBall(Program, center4, radius4, color4);
         const skyboxbuffer = initSkybox(Program);
 
-        LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objbuffers, 0.8, false);
+        LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objDocArray, mtlDocArray, 0.8, false);
         //LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, false);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
@@ -443,13 +445,16 @@ window.onload = function () {
 
             requestAnimationFrame(render);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
+            if(mtlDocArray[0] && objDocArray[0]){
+                getDrawingInfo(Program.gl, objbuffers, objDocArray[0], mtlDocArray[0]);
+                if (objbuffers[0])
+                    drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
+            }
             drawSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
             drawTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
             drawTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
             drawTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
             drawTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
-            if (objbuffers[0])
-                drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
             // if (objbuffers[1])
             //     draw(Program, objbuffers[1], modelMatrix6, viewMatrix, projectionMatrix);
             nochange_translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
@@ -458,3 +463,46 @@ window.onload = function () {
     }
 
 };
+
+function getDrawingInfo(gl, buffers, objDocs, mtlDocs){
+
+    var positions = new Array(0);
+    var indices = new Array(0);
+    var normals = new Array(0);
+    var textureCoords = new Array(0);
+    var colors = new Array(0);
+    var numIndices = 0;
+    for(var i = 0; i < objDocs.objects.length; i++){
+        numIndices += objDocs.objects[i].numIndices;
+        //每一个objects[i].numIndices 是它的所有的face的顶点数加起来
+    }
+    // for(var i = 0; i < objDocs.textureCoords.length; i++)
+    //     textureCoords.push(objDocs.textureCoords[i].x, objDocs.textureCoords[i].y);
+    var index_indices = 0;
+    for(var i = 0; i < objDocs.objects.length; i++){
+        var currentObject = objDocs.objects[i];
+        for(var j = 0; j < currentObject.faces.length; j++){
+            var currentFace = currentObject.faces[j];
+            for(var k = 0; k < currentFace.vIndices.length; k++){
+              colors.push(0.8, 0.8, 0.8, 1);
+              indices.push(index_indices % numIndices);
+              var vIdx = currentFace.vIndices[k];
+              var tIdx = currentFace.tIndices[k];
+              var nIdx = currentFace.nIndices[k];
+              positions.push(objDocs.vertices[vIdx].x, objDocs.vertices[vIdx].y, objDocs.vertices[vIdx].z);
+              if(tIdx >= 0)
+                  textureCoords.push(objDocs.textureCoords[tIdx].x, objDocs.textureCoords[tIdx].y);
+              else
+                  textureCoords.push(0, 0);
+              if(nIdx >= 0)
+                  normals.push(objDocs.normals[nIdx].x, objDocs.normals[nIdx].y, objDocs.normals[nIdx].z);
+              else
+                  normals.push(currentFace.normal[0], currentFace.normal[1], currentFace.normal[2]);  
+              index_indices++;
+            }
+        }
+    }
+    temp = initTextBuffers(gl, positions, colors, indices, normals, textureCoords);
+    buffers.push(temp);
+
+}
