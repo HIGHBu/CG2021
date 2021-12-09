@@ -1,6 +1,6 @@
 function loadSkybox(gl, urls) {
     const texture = gl.createTexture(); //1.创建一个GL纹理对象
-    gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture); //2.新创建的纹理对象绑定到 gl.TEXTURE_2D 来让它成为当前操作纹理。
+    gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture); //2.新创建的纹理对象绑定到 gl.TEXTURE_CUBE 来让它成为当前操作纹理。
 
     // 初始化纹理
     const level = 0;

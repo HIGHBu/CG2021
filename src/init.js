@@ -34,16 +34,45 @@ function initProgram() {
     //定义天空盒片段着色器
     const sky_fsSource = `
     varying highp vec3 vTextureCoord;
-    
+    precision mediump float;
     uniform samplerCube uSampler;
 
     void main() {
-      gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
+      gl_FragColor=textureCube(uSampler, normalize(vTextureCoord));
+    }
+  `;
+    //定义雾天天空盒顶点着色器
+    const fog_sky_vsSource = `
+    attribute vec4 aTextureCoord;   //纹理坐标
+
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+
+    varying highp vec3 vTextureCoord;
+    
+    void main() {
+      vec4 pos = uProjectionMatrix * uViewMatrix * aTextureCoord;  //点坐标位置
+      gl_Position = pos.xyww; //使其深度始终是w/w = 1,欺骗深度检测使天空盒在深处
+      vTextureCoord = aTextureCoord.xyz;
+    }
+  `;
+    //定义雾天天空盒片段着色器
+    const fog_sky_fsSource = `
+    varying highp vec3 vTextureCoord;
+    precision mediump float;
+    uniform samplerCube uSampler;
+
+    void main() {
+        float n=0.3;
+        vec4 grey;
+        grey=vec4(n, n, n,1.0);
+        vec4 color=textureCube(uSampler, normalize(vTextureCoord));
+        
+      gl_FragColor = mix(color,grey,0.5);
     }
   `;
     //定义纹理顶点着色器
     const Texture_vsSource = `
-    attribute vec4 aVertexColor; //颜色属性，用四维向量表示（第四维无意义，用于计算）
     attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
     attribute vec4 aNormal; //法向量
     attribute vec2 aTextCoord; //纹理
@@ -53,7 +82,6 @@ function initProgram() {
     uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
     uniform mat4 uReverseModelMatrix; //模型矩阵的逆转置
 
-    varying vec4 v_Color;       //颜色varying类变量，用于向片段着色器传递颜色属性
     varying vec3 v_Normal;
     varying vec4 v_Position;
     varying vec2 v_TextCoord;
@@ -65,30 +93,26 @@ function initProgram() {
         //变化后的坐标 -> 世界坐标
         v_Position = uModelMatrix * aVertexPosition;
         v_TextCoord = aTextCoord;
-        v_Color = aVertexColor;        //点的颜色
     }
   `;
-
     //定义纹理片段着色器
     const Texture_fsSource = `
     precision mediump float;
     uniform sampler2D uSampler;
     uniform vec3 uLightColor; //光颜色强度
     uniform vec3 uLightDirection; //光线方向
-    uniform vec3 uEyePosition;  //观察位置
+
     uniform vec3 uAmbientLight; // 环境光
     
     varying vec3 v_Normal;
     varying vec4 v_Position;
-    varying vec4 v_Color;
     varying vec2 v_TextCoord;
     
     void main() {
         //纹理作为颜色传入
         vec4 v_Color=texture2D(uSampler,v_TextCoord);
         //视线方向并归一化
-        vec3 viewDirection = normalize(uEyePosition - vec3(v_Position));
-        //光线方向并归一化
+
         vec3 lightDirection = normalize(uLightDirection);
         //计算cos入射角 当角度大于90 说明光照在背面 赋值为0
         float nDotLight = max(dot(lightDirection, v_Normal), 0.0);
@@ -97,6 +121,75 @@ function initProgram() {
         // 环境反射光颜色
         vec3 ambient = uAmbientLight * v_Color.rgb;
         gl_FragColor = vec4(diffuse + ambient, v_Color.a);
+    }
+  `;
+    //定义雾天纹理顶点着色器
+    const fog_Texture_vsSource = `
+    attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
+    attribute vec4 aNormal; //法向量
+    attribute vec2 aTextCoord; //纹理
+
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+    uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+    uniform mat4 uReverseModelMatrix; //模型矩阵的逆转置
+    
+    varying vec3 v_Normal;
+    varying vec4 v_Position;
+    varying vec2 v_TextCoord;
+    varying vec3 vposition;     //用于计算距离的position
+
+    void main() {
+        gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;  //点坐标位置
+        //法向量进行归一化
+        v_Normal = normalize(vec3(uReverseModelMatrix * aNormal));
+        //变化后的坐标 -> 世界坐标
+        v_Position = uModelMatrix * aVertexPosition;
+        v_TextCoord = aTextCoord;
+        vposition = v_Position.xyz;
+    }
+  `;
+    //定义雾天纹理片段着色器
+    const fog_Texture_fsSource = `
+    precision mediump float;
+    uniform sampler2D uSampler;
+    uniform vec3 uEyePosition;  //观察位置
+    uniform vec3 uLightColor; //光颜色强度
+    uniform vec3 uLightDirection; //光源方向
+    uniform vec3 uAmbientLight; // 环境光
+    uniform float uFogDenisty;  //雾的密度
+    uniform samplerCube uCubeSampler;
+
+    varying vec3 v_Normal;
+    varying vec4 v_Position;
+    varying vec2 v_TextCoord;
+    varying vec3 vposition;     //用于计算距离的position
+
+    void main() {
+        vec3 viewDirection = normalize(uEyePosition - vposition); //通过uEyePosition和vpositon算出视线
+        vec3 TextureCoord = viewDirection;  //天空盒对应的纹理坐标数值上跟视线一样
+        float n=0.3;
+        vec4 grey;
+        grey=vec4(n, n, n,1.0);
+        vec4 fogcolor = textureCube(uCubeSampler, normalize(TextureCoord));  // 雾的颜色
+        fogcolor = mix(fogcolor,grey,0.5);
+        //纹理作为颜色传入
+        vec4 v_Color=texture2D(uSampler,v_TextCoord);
+        #define LOG2 1.442695
+        float fogDistance = length(vposition);
+        float fogAmount = 1.0 - exp2(-uFogDenisty * uFogDenisty * fogDistance * fogDistance * LOG2);
+        fogAmount = clamp(fogAmount, 0.0, 1.0);
+        fogAmount = max(0.4,fogAmount);
+        vec4 color=mix(v_Color, fogcolor, fogAmount); 
+        //光线方向并归一化
+        vec3 lightDirection = normalize(uLightDirection);
+        //计算cos入射角 当角度大于90 说明光照在背面 赋值为0
+        float cosLight = max(dot(lightDirection, v_Normal), 0.0);
+        //计算漫反射反射光颜色
+        vec3 diffuse = normalize(uLightColor) * color.rgb * cosLight;
+        // 环境反射光颜色
+        vec3 ambient = uAmbientLight * color.rgb;
+        gl_FragColor = vec4(diffuse + ambient, color.a);
     }
   `;
     //定义顶点着色器
@@ -122,7 +215,6 @@ function initProgram() {
       vNomral = normalize(vec3(uNormalMatrix * aVertexNormal));
     }
   `;
-
     //定义片段着色器
     const fsSource = `
     precision mediump float;
@@ -146,11 +238,78 @@ function initProgram() {
       gl_FragColor = vec4(diffuse + ambient, vColor.a);
     }
   `;
+    //定义雾顶点着色器
+    const fog_vsSource = `
+    attribute vec4 aVertexColor; //颜色属性，用四维向量表示（第四维无意义，用于计算）
+    attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
+    attribute vec4 aVertexNormal; //法向量
+   
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+    uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+    uniform mat4 uNormalMatrix; //模型矩阵的逆转置,用于变换法向量
 
+    varying lowp vec4 vColor;        //颜色varying类变量，用于向片段着色器传递颜色属性
+    varying lowp vec3 vNomral;
+    varying lowp vec4 vPosition;
+    varying lowp vec3 vposition;     //用于计算距离的position
+
+    void main() {
+      gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;  //点坐标位置
+      vColor = aVertexColor;        //点的颜色
+      //变化后的坐标 -> 世界坐标
+      vPosition = uModelMatrix * aVertexPosition;
+      vNomral = normalize(vec3(uNormalMatrix * aVertexNormal));
+      vposition = vPosition.xyz;
+    }
+  `;
+    //定义雾片段着色器
+    const fog_fsSource = `
+    precision mediump float;
+    uniform vec3 uEyePosition;  //观察位置
+    uniform vec3 uLightColor; //光颜色强度
+    uniform vec3 uLightDirection; //光源方向
+    uniform vec3 uAmbientLight; // 环境光
+    uniform float uFogDenisty;  //雾的密度
+    uniform samplerCube uSampler;
+
+    varying lowp vec4 vColor;
+    varying lowp vec3 vNomral;
+    varying lowp vec4 vPosition;
+    varying lowp vec3 vposition;
+
+    void main() {
+      vec3 viewDirection = normalize(uEyePosition - vposition); //通过uEyePosition和vpositon算出视线
+      vec3 TextureCoord = viewDirection;  //天空盒对应的纹理坐标数值上跟视线一样
+      float n=0.3;
+      vec4 grey;
+      grey=vec4(n, n, n,1.0);
+      vec4 fogcolor = textureCube(uSampler, normalize(TextureCoord));  // 雾的颜色
+      fogcolor = mix(fogcolor,grey,0.5);
+      #define LOG2 1.442695
+      float fogDistance = length(vposition);
+      float fogAmount = 1.0 - exp2(-uFogDenisty * uFogDenisty * fogDistance * fogDistance * LOG2);
+      fogAmount = clamp(fogAmount, 0.0, 1.0);
+      fogAmount = max(0.4,fogAmount);
+      vec4 color=mix(vColor, fogcolor, fogAmount); 
+
+      vec3 lightDirection = normalize(uLightDirection);
+      //计算cos入射角.当角度大于90,说明光照在背面,赋值为0
+      float cosLight = max(dot(lightDirection, vNomral), 0.0);
+      //计算漫反射反射光颜色
+      vec3 diffuse = normalize(uLightColor) * color.rgb * cosLight;
+      // 环境反射光颜色
+      vec3 ambient = uAmbientLight * color.rgb;
+      gl_FragColor = vec4(diffuse + ambient, color.a);
+    }
+  `;
     //初始化着色器程序
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
+    const fog_shaderProgram = initShaderProgram(gl, fog_vsSource, fog_fsSource);
     const sky_shaderProgram = initShaderProgram(gl, sky_vsSource, sky_fsSource);
+    const fogsky_shaderProgram = initShaderProgram(gl, fog_sky_vsSource, fog_sky_fsSource);
     const Texture_shaderProgram = initShaderProgram(gl, Texture_vsSource, Texture_fsSource);
+    const fog_Texture_shaderProgram = initShaderProgram(gl, fog_Texture_vsSource, fog_Texture_fsSource);
 
     //收集着色器程序会用到的所有信息
     const programInfo = {
@@ -159,7 +318,6 @@ function initProgram() {
             vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
             vertexColor: gl.getAttribLocation(shaderProgram, 'aVertexColor'),
             vertexNormal: gl.getAttribLocation(shaderProgram, 'aVertexNormal'),
-
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(shaderProgram, 'uProjectionMatrix'),
@@ -169,6 +327,26 @@ function initProgram() {
             uLightColor: gl.getUniformLocation(shaderProgram, 'uLightColor'),
             uLightDirection: gl.getUniformLocation(shaderProgram, 'uLightDirection'),
             uAmbientLight: gl.getUniformLocation(shaderProgram, 'uAmbientLight'),
+        },
+    };
+    const fog_programInfo = {
+        program: fog_shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(fog_shaderProgram, 'aVertexPosition'),
+            vertexColor: gl.getAttribLocation(fog_shaderProgram, 'aVertexColor'),
+            vertexNormal: gl.getAttribLocation(fog_shaderProgram, 'aVertexNormal'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(fog_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(fog_shaderProgram, 'uViewMatrix'),
+            modelMatrix: gl.getUniformLocation(fog_shaderProgram, 'uModelMatrix'),
+            normalMatrix: gl.getUniformLocation(fog_shaderProgram, 'uNormalMatrix'),
+            uEyePosition: gl.getUniformLocation(fog_shaderProgram, 'uEyePosition'),
+            uLightColor: gl.getUniformLocation(fog_shaderProgram, 'uLightColor'),
+            uLightDirection: gl.getUniformLocation(fog_shaderProgram, 'uLightDirection'),
+            uAmbientLight: gl.getUniformLocation(fog_shaderProgram, 'uAmbientLight'),
+            uFogDenisty: gl.getUniformLocation(fog_shaderProgram, 'uFogDenisty'),
+            uSampler: gl.getUniformLocation(fog_shaderProgram, 'uSampler'),
         },
     };
     const sky_programInfo = {
@@ -182,11 +360,21 @@ function initProgram() {
             uSampler: gl.getUniformLocation(sky_shaderProgram, 'uSampler'),
         },
     };
+    const fogsky_programInfo = {
+        program: fogsky_shaderProgram,
+        attribLocations: {
+            textureCoord: gl.getAttribLocation(fogsky_shaderProgram, 'aTextureCoord'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(fogsky_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(fogsky_shaderProgram, 'uViewMatrix'),
+            uSampler: gl.getUniformLocation(fogsky_shaderProgram, 'uSampler'),
+        },
+    };
     const Texture_programInfo = {
         program: Texture_shaderProgram,
         attribLocations: {
             vertexPosition: gl.getAttribLocation(Texture_shaderProgram, 'aVertexPosition'),
-            vertexColor: gl.getAttribLocation(Texture_shaderProgram, 'aVertexColor'),
             normal: gl.getAttribLocation(Texture_shaderProgram, 'aNormal'),
             TextCoord: gl.getAttribLocation(Texture_shaderProgram, 'aTextCoord'),
         },
@@ -197,12 +385,31 @@ function initProgram() {
             reverseModelMatrix: gl.getUniformLocation(Texture_shaderProgram, 'uReverseModelMatrix'),
             Sampler: gl.getUniformLocation(Texture_shaderProgram, 'uSampler'),
             lightColor: gl.getUniformLocation(Texture_shaderProgram, 'uLightColor'),
-            eyePosition: gl.getUniformLocation(Texture_shaderProgram, 'uEyePosition'),
             lightDirection: gl.getUniformLocation(Texture_shaderProgram, 'uLightDirection'),
             ambient: gl.getUniformLocation(Texture_shaderProgram, 'uAmbientLight'),
         },
     };
-
+    const fog_Texture_programInfo = {
+        program: fog_Texture_shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(fog_Texture_shaderProgram, 'aVertexPosition'),
+            normal: gl.getAttribLocation(fog_Texture_shaderProgram, 'aNormal'),
+            TextCoord: gl.getAttribLocation(fog_Texture_shaderProgram, 'aTextCoord'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(fog_Texture_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(fog_Texture_shaderProgram, 'uViewMatrix'),
+            modelMatrix: gl.getUniformLocation(fog_Texture_shaderProgram, 'uModelMatrix'),
+            reverseModelMatrix: gl.getUniformLocation(fog_Texture_shaderProgram, 'uReverseModelMatrix'),
+            Sampler: gl.getUniformLocation(fog_Texture_shaderProgram, 'uSampler'),
+            lightColor: gl.getUniformLocation(fog_Texture_shaderProgram, 'uLightColor'),
+            eyePosition: gl.getUniformLocation(fog_Texture_shaderProgram, 'uEyePosition'),
+            lightDirection: gl.getUniformLocation(fog_Texture_shaderProgram, 'uLightDirection'),
+            ambient: gl.getUniformLocation(fog_Texture_shaderProgram, 'uAmbientLight'),
+            fogDensity: gl.getUniformLocation(fog_Texture_shaderProgram, 'uFogDenisty'),
+            CubeSampler: gl.getUniformLocation(fog_Texture_shaderProgram, 'uCubeSampler')
+        },
+    };
     gl.clearColor(0.5, 0.5, 0.5, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -213,8 +420,11 @@ function initProgram() {
         canvas: canvas,
         gl: gl,
         programInfo: programInfo,
+        fog_programInfo: fog_programInfo,
         sky_programInfo: sky_programInfo,
+        fogsky_programInfo: fogsky_programInfo,
         Texture_programInfo: Texture_programInfo,
+        fog_Texture_programInfo: fog_Texture_programInfo,
     }
 }
 
