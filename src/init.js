@@ -16,7 +16,6 @@ function initProgram() {
     document.onkeydown = handleKeyDown;
     document.onkeyup = handleKeyUp;
 
-    //定义天空盒顶点着色器
     const sky_vsSource = `
     attribute vec4 aTextureCoord;   //纹理坐标
 
@@ -24,21 +23,228 @@ function initProgram() {
     uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
 
     varying highp vec3 vTextureCoord;
-    
+    varying vec4 vPosition;
+
     void main() {
       vec4 pos = uProjectionMatrix * uViewMatrix * aTextureCoord;  //点坐标位置
       gl_Position = pos.xyww; //使其深度始终是w/w = 1,欺骗深度检测使天空盒在深处
       vTextureCoord = aTextureCoord.xyz;
+      vPosition = aTextureCoord;
     }
   `;
     //定义天空盒片段着色器
     const sky_fsSource = `
-    varying highp vec3 vTextureCoord;
     precision mediump float;
+
+    varying highp vec3 vTextureCoord;
+    varying vec4 vPosition;
+
     uniform samplerCube uSampler;
+    uniform vec3 uEyePosition;
+    uniform vec3 uTargetPosition;
+    uniform vec3 uUp;
+    uniform vec3 uLightDirection;
+    uniform vec2 uResolution;
+    uniform float uTime;
+
+    vec3 random_worly(vec3 p) {
+        p = vec3(
+                dot(p,vec3(127.1,311.7,69.5)),
+                dot(p,vec3(269.5,183.3,132.7)), 
+                dot(p,vec3(247.3,108.5,96.5)) 
+                );
+        return fract(sin(p)*43758.5453123);
+    }
+
+    float noise_worley(vec3 st) {
+        // Tile the space
+        vec3 i_st = floor(st);
+        vec3 f_st = fract(st);
+        float min_dist = 1.;
+        for (int i = -1; i <= 1; i++) {
+            for (int j = -1; j <= 1; j++) {
+                for (int k = -1; k <= 1; k++) {
+                    vec3 neighbor = vec3(float(i),float(j),float(k));
+                    vec3 point = random_worly(i_st + neighbor);
+                    float d = length(point + neighbor - f_st);
+                    min_dist = min(min_dist,d);
+                }
+            }
+        }
+        return pow(min_dist,2.);
+    }
+
+    float noise_worley_fbm_abs(vec3 p)
+    {
+        float f = 0.0;
+        float a = 0.5;
+        for (int i = 0; i < 6; i++) {
+            f += a * abs(noise_worley(p)-.5);
+            p = 2. * p;
+            a /= 2.;
+        }
+    
+        return f;
+    }
+
+    vec3 random_perlin(vec3 p) {
+        p = vec3(
+                dot(p,vec3(127.1,311.7,69.5)),
+                dot(p,vec3(269.5,183.3,132.7)), 
+                dot(p,vec3(247.3,108.5,96.5)) 
+                );
+        return -1.0 + 2.0*fract(sin(p)*43758.5453123);
+    }
+    float noise_perlin(vec3 p) {
+        vec3 i = floor(p);
+        vec3 s = fract(p);
+
+        // 3D网格有8个顶点
+        float a = dot(random_perlin(i),s);
+        float b = dot(random_perlin(i + vec3(1, 0, 0)),s - vec3(1, 0, 0));
+        float c = dot(random_perlin(i + vec3(0, 1, 0)),s - vec3(0, 1, 0));
+        float d = dot(random_perlin(i + vec3(0, 0, 1)),s - vec3(0, 0, 1));
+        float e = dot(random_perlin(i + vec3(1, 1, 0)),s - vec3(1, 1, 0));
+        float f = dot(random_perlin(i + vec3(1, 0, 1)),s - vec3(1, 0, 1));
+        float g = dot(random_perlin(i + vec3(0, 1, 1)),s - vec3(0, 1, 1));
+        float h = dot(random_perlin(i + vec3(1, 1, 1)),s - vec3(1, 1, 1));
+
+        // Smooth Interpolation
+        vec3 u = smoothstep(0.,1.,s);
+
+        // 根据八个顶点进行插值
+        return mix(mix(mix( a, b, u.x),
+                    mix( c, e, u.x), u.y),
+                mix(mix( d, f, u.x),
+                    mix( g, h, u.x), u.y), u.z);
+    }
+    float noise_perlin_fbm(vec3 p)
+    {
+        float f = 0.0;
+        p = 2. * p;
+        float a = 2.;
+        for (int i = 0; i < 6; i++) {
+            f += a * noise_perlin(p);
+            p = 2.0 * p;
+            a /= 2.;
+        }
+        // f = sin(f + p.x/1000.0);
+    
+        return f;
+    }
+    float map(in vec3 p, float oct){
+        vec3 q = p - vec3(0.0,0.1,1.0) * uTime;
+        float g1 = 0.5+0.5*noise_worley( q*0.3 );
+        float g2 = 0.5+0.5*noise_worley( q*0.3 );
+        
+        float f1, f2;
+        f1 = noise_perlin_fbm(q);
+        f2 = noise_worley_fbm_abs(q * oct);
+        
+        //f1 * a - 0.75, a越大，起伏细节越多
+        f1 = mix( f1*0.1-0.75, f1, g1*g1 ) + 0.1;
+        //f2 * a - 0.75, a越大，云朵的细胞感越强
+        f2 = mix( f2*0.2-0.75, f2, g2*g2 ) + 0.1;
+        
+        //float f = 1. - f1 + f2;
+        float f = mix(f1, f2, 0.6);
+        return 1.5*f - 0.5 - p.y;
+    }
+    
+    vec3 sundir = normalize(vec3(-1.0,0.0,-1.0));
+    const int kDiv = 1; // make bigger for higher quality
+    
+    vec4 raymarch( in vec3 ro, in vec3 rd, in vec3 bgcol){
+        // 视角范围
+        const float y_bottom = -6.0;
+        const float y_top =  6.0;
+        //rd本身被归一化，分量小于1，用除法，使得步进范围大
+        float t_bottom = 10. * (y_bottom-ro.y)/rd.y;
+        float t_top = 10. * (y_top-ro.y)/rd.y;
+    
+        // 确认需要ray march的区域
+        float tmin, tmax;
+
+            tmin = 0.0;
+            tmax = 1000.0;
+            // t_bottom为正表示视线朝下
+            if(t_bottom > 0.0)
+                tmax = min(tmax, t_bottom);
+            // t_top为正表示视线朝上
+            if(t_top > 0.0)
+                tmax = min(tmax, t_top);
+
+        
+        float t = tmin;
+        
+        // raymarch loop
+        vec4 sum = vec4(0.0);
+        for( int i=0; i<100*kDiv; i++ )
+        {
+           // step size
+           float dt = max(0.1,0.01*t/float(kDiv));
+    
+           float oct = 3. - log2(1.0+t*0.5);
+
+           //cloud
+           vec3 pos = ro + t*rd;
+           float den = map(pos,oct);
+           if( den > 0.01 ){ // if inside
+               // do lighting
+               float dif = clamp((den - map(pos+0.3 * sundir, oct)) / 0.3, 0.0, 1.0 );
+               vec3  lin = vec3(0.65, 0.65, 0.75) * 1.1 + 0.8 * vec3(1.0, 0.6, 0.3) * dif;
+               vec4  col = vec4(mix(vec3(1.0,0.95,0.8), vec3(0.25,0.3,0.35), den), den);
+               col.xyz *= lin;
+               // fog
+               col.xyz = mix(col.xyz, bgcol, 1.0 - exp2(-0.003 * t * t));
+               // composite front to back
+               col.w    = min(col.w * 8.0 * dt,1.0);
+               col.rgb *= col.a;
+               sum += col*(1.0-sum.a);
+           }
+           // advance ray
+           t += dt;
+           // until far clip or full opacity
+           if( t>tmax || sum.a>0.99 ) break;
+        }
+    
+        return clamp(sum, 0.0, 1.0);
+    }
+    
+    vec4 render(in vec3 ro, in vec3 rd){
+        float sun = clamp( dot(sundir,rd), 0.0, 1.0 );
+    
+        // background sky
+        vec3 col = vec3(0.76,0.75,0.86);
+        col -= 0.6*vec3(0.90,0.75,0.95)*rd.y;
+        col += 0.2*vec3(1.00,0.60,0.10)*pow( sun, 8.0 );
+    
+    
+        // clouds    
+        vec4 res = raymarch(ro, rd, col);
+        col = col*(1.0-res.w) + res.xyz;
+        
+        // sun glare    
+        col += 0.2*vec3(1.0,0.4,0.2)*pow(sun, 3.0);
+    
+        // tonemap
+        col = smoothstep(0.15,1.1,col);
+     
+        return vec4( col, 1.0 );
+    }
 
     void main() {
-      gl_FragColor=textureCube(uSampler, normalize(vTextureCoord));
+      vec2 p = (2.0*gl_FragCoord.xy-uResolution.xy)/uResolution.y;
+
+      vec3 cu = normalize(uTargetPosition - uEyePosition);
+      vec3 cv = normalize(uUp);
+      vec3 cw = normalize(cross(cu, cv));
+      mat3 ca = mat3(cu, cv, cw);
+      // ray
+      vec3 rd = ca * normalize(vTextureCoord);
+      
+      gl_FragColor = render(uEyePosition, normalize(vTextureCoord));
+      // gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
     }
   `;
     //定义雾天天空盒顶点着色器
@@ -358,6 +564,12 @@ function initProgram() {
             projectionMatrix: gl.getUniformLocation(sky_shaderProgram, 'uProjectionMatrix'),
             viewMatrix: gl.getUniformLocation(sky_shaderProgram, 'uViewMatrix'),
             uSampler: gl.getUniformLocation(sky_shaderProgram, 'uSampler'),
+            eyePosition: gl.getUniformLocation(sky_shaderProgram, 'uEyePosition'),
+            targetPosition: gl.getUniformLocation(sky_shaderProgram, 'uTargetPosition'),
+            up: gl.getUniformLocation(sky_shaderProgram, 'uUp'),
+            lightDirection: gl.getUniformLocation(sky_shaderProgram, 'uLightDirection'),
+            uResolution: gl.getUniformLocation(sky_shaderProgram, 'uResolution'),
+            time: gl.getUniformLocation(sky_shaderProgram, 'uTime'),
         },
     };
     const fogsky_programInfo = {

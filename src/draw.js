@@ -1,4 +1,4 @@
-var weather = 1;//0代表晴天，1代表雾天
+var weather = 0;//0代表晴天，1代表雾天
 
 var objbuffers = [];
 var objDocArray = [];
@@ -61,7 +61,7 @@ window.onload = function () {
     }
 
     //天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
-    function drawSkybox(Program, buffer, skybox, viewMatrix, projectionMatrix) {
+    function drawSkybox(Program, buffer, time, skybox, viewMatrix, projectionMatrix) {
         {
             const numComponents = 3;//每次取出3个数值
             const type = Program.gl.FLOAT;//取出数据为浮点数类型
@@ -95,6 +95,28 @@ window.onload = function () {
             Program.sky_programInfo.uniformLocations.viewMatrix,
             false,
             viewMatrix);
+        const resolution = vec2.fromValues(cw, ch);
+        Program.gl.uniform2fv(
+            Program.sky_programInfo.uniformLocations.uResolution,
+            resolution);
+        const eyePosition = vec3.fromValues(eye[0], eye[1], eye[2]);
+        Program.gl.uniform3fv(
+            Program.sky_programInfo.uniformLocations.eyePosition,
+            eyePosition);
+        const targetPosition = vec3.fromValues(target[0], target[1], target[2]);
+        Program.gl.uniform3fv(
+            Program.sky_programInfo.uniformLocations.targetPosition,
+            targetPosition);
+        const upPosition = vec3.fromValues(up[0], up[1], up[2]);
+        Program.gl.uniform3fv(
+            Program.sky_programInfo.uniformLocations.up,
+            upPosition);
+        Program.gl.uniform3fv(
+            Program.sky_programInfo.uniformLocations.uLightDirection,
+            lightDirection);
+        Program.gl.uniform1f(
+            Program.sky_programInfo.uniformLocations.time,
+            time);
         {
             const offset = 0;
             const type = Program.gl.UNSIGNED_SHORT;
@@ -699,7 +721,7 @@ window.onload = function () {
                     drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
             }
             if (weather == 0) {
-                drawSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
+                drawSkybox(Program, skyboxbuffer,  now / 20, skybox, viewMatrix, projectionMatrix);
                 drawTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
                 drawTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
                 drawTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
