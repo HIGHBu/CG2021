@@ -1,11 +1,14 @@
 var weather = 1;//0代表晴天，1代表雾天
-var score = 0;
+var score = 0;//获得分数
+var crash = 0;//坠毁标志
+var boom_time = 1000;//爆炸用计时器
 var objbuffers = [];
 var objDocArray = [];
 var mtlDocArray = [];
 
 var frame = 0;  // 帧数
-var time = 0;   // 用于计算帧数的时间
+var fps_time = 0;   // 用于计算帧数的时间
+var show_frame;
 
 var eye = [0, 0, 6];
 var target = [0, 0, 0];
@@ -35,16 +38,28 @@ var modelzrotation = new Rotation(0, [0, 0, 1]);
 function change_weather() {
     weather = 1 - weather;
 }
-
+function change_crash() {
+    crash = 1 - crash;
+    boom_time = 0;
+}
 window.onload = function () {
 
     function draw2D(ctx) {
+        
         ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        frame++;
+        var curTime = new Date().getTime();
+        if (curTime - fps_time > 1000) {
+            fps_time = curTime;
+            show_frame=frame;
+            frame = 0;
+        }
         ctx.font = '18px "Times New Roman"';
         ctx.fillStyle = 'rgba(255,255,255,1)';
         ctx.fillText('Current Speed:' + Math.floor(speed * 10) / 10.0, window.innerWidth - 300, window.innerHeight - 100);
         ctx.fillText('Current Rotation:' + Math.floor(rotation.rad * 100) / 100.0, window.innerWidth - 300, window.innerHeight - 80);
         ctx.fillText('Current Score:' + Math.floor(score), window.innerWidth - 300, window.innerHeight - 60);
+        ctx.fillText("FPS: " + show_frame, 50, 20);
     }
     function initTextures(Program, gl, filepath, index) {
         var texture = gl.createTexture(); // Create texture
@@ -609,6 +624,90 @@ window.onload = function () {
         }
     }
 
+    function drawParticle(Program, buffers, time, modelMatrix, viewMatrix, projectionMatrix) {
+        //为webGL设置从缓冲区抽取start数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.start);
+            Program.gl.vertexAttribPointer(
+                Program.particle_programInfo.attribLocations.start,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.particle_programInfo.attribLocations.start);
+        }
+        //为webGL设置从缓冲区抽取end数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.end);
+            Program.gl.vertexAttribPointer(
+                Program.particle_programInfo.attribLocations.end,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.particle_programInfo.attribLocations.end);
+        }//为webGL设置从缓冲区抽取lifetime数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 1;//每次取出1个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.lifetime);
+            Program.gl.vertexAttribPointer(
+                Program.particle_programInfo.attribLocations.lifetime,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.particle_programInfo.attribLocations.lifetime);
+        }
+        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+        //webGL使用此程序进行绘制
+        Program.gl.useProgram(Program.particle_programInfo.program);
+
+        // 设置着色器的uniform型变量
+        Program.gl.uniformMatrix4fv(
+            Program.particle_programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.particle_programInfo.uniformLocations.viewMatrix,
+            false,
+            viewMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.particle_programInfo.uniformLocations.modelMatrix,
+            false,
+            modelMatrix);
+        Program.gl.uniform1f(
+            Program.particle_programInfo.uniformLocations.time,
+            time
+        );
+        {
+            const offset = 0;
+            const type = Program.gl.UNSIGNED_SHORT;
+            const vertexCount = buffers.indices.length;
+            //按连续的点方式以此按点绘制
+            Program.gl.drawElements(Program.gl.POINTS, vertexCount, type, offset);
+        }
+    }
+
     //设置模型矩阵，translation为模型的平移，rotation为模型的旋转。modelrotation，modelrotation用于模型的方向修正
     function setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation,) {
         const modelMatrix = mat4.create();
@@ -680,6 +779,7 @@ window.onload = function () {
         var center2 = [0.5, 0.0, 0.0];
         var center3 = [0.0, 0.5, 0.0];
         var center4 = [2.0, 2.0, 0.0];
+        var center5 = [2.0, 1.0, 0.0];
         var radius1 = 0.2;
         var radius2 = 0.15;
         var radius3 = 0.15;
@@ -698,6 +798,7 @@ window.onload = function () {
         const ballbuffer2 = initTextureBall(Program, center2, radius2, color2);
         const ballbuffer3 = initTextureBall(Program, center3, radius3, color3);
         const ballbuffer4 = initTextureBall(Program, center4, radius4, color4);
+        const particlebuffer = initBoomParticle(Program, center, 1.5, 0.5);
         const skyboxbuffer = initSkybox(Program);
 
         LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objDocArray, mtlDocArray, 0.8, false);
@@ -712,18 +813,6 @@ window.onload = function () {
         var then = 0;
         // Draw the scene repeatedly
         function render(now) {
-            frame++;
-            var curTime = new Date().getTime();
-            if(curTime - time > 1000) {
-                var c2d = document.getElementById('fps').getContext('2d');
-                c2d.clearRect(0, 0, c2d.canvas.width, c2d.canvas.height);
-                c2d.font = "20px Consolas";
-                c2d.fillStyle = "#ff00ff";
-                c2d.fillText("FPS: " + frame, 5, 20);
-
-                time = curTime;
-                frame = 0;
-            }
 
             now *= 0.001;  // convert to seconds
             const deltaTime = now - then;
@@ -737,15 +826,21 @@ window.onload = function () {
             const modelMatrix3 = setModelMatrix(nochange_translation, nochange_rotation);
             const modelMatrix4 = setModelMatrix(nochange_translation, nochange_rotation);
             const modelMatrix5 = setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation);
-            const modelMatrix6 = setModelMatrix(nochange_translation, nochange_rotation);
+            const modelMatrix6 = setModelMatrix(translation, rotation);
 
             requestAnimationFrame(render);
             draw2D(Program.ctx);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
-            if (mtlDocArray[0] && objDocArray[0]) {
-                getDrawingInfo(Program.gl, objbuffers, objDocArray[0], mtlDocArray[0]);
-                if (objbuffers[0])
-                    drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
+            if (crash == 0) {
+                if (mtlDocArray[0] && objDocArray[0]) {
+                    getDrawingInfo(Program.gl, objbuffers, objDocArray[0], mtlDocArray[0]);
+                    if (objbuffers[0])
+                        drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
+                }
+            }
+            else {
+                drawParticle(Program, particlebuffer, boom_time, modelMatrix6, viewMatrix, projectionMatrix);
+                boom_time = boom_time + 0.001;
             }
             if (weather == 0) {
                 drawSkybox(Program, skyboxbuffer, now / 20, skybox, viewMatrix, projectionMatrix);
@@ -763,9 +858,6 @@ window.onload = function () {
                 drawfogTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
                 drawfogTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
             }
-
-            // if (objbuffers[1])
-            //     draw(Program, objbuffers[1], modelMatrix6, viewMatrix, projectionMatrix);
             nochange_translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
         }
         requestAnimationFrame(render);
