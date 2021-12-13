@@ -4,6 +4,9 @@ var objbuffers = [];
 var objDocArray = [];
 var mtlDocArray = [];
 
+var frame = 0;  // 帧数
+var time = 0;   // 用于计算帧数的时间
+
 var eye = [0, 0, 6];
 var target = [0, 0, 0];
 var up = [0, 2, 0];
@@ -709,6 +712,19 @@ window.onload = function () {
         var then = 0;
         // Draw the scene repeatedly
         function render(now) {
+            frame++;
+            var curTime = new Date().getTime();
+            if(curTime - time > 1000) {
+                var c2d = document.getElementById('fps').getContext('2d');
+                c2d.clearRect(0, 0, c2d.canvas.width, c2d.canvas.height);
+                c2d.font = "20px Consolas";
+                c2d.fillStyle = "#ff00ff";
+                c2d.fillText("FPS: " + frame, 5, 20);
+
+                time = curTime;
+                frame = 0;
+            }
+
             now *= 0.001;  // convert to seconds
             const deltaTime = now - then;
             then = now;
