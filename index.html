@@ -16,13 +16,14 @@
 <body>
   <canvas id="glcanvas" width="1440" height="820" style="position:absolute;z-index:0;"></canvas>
   <canvas id="hud" width="1440" height="820" style="position:absolute;z-index:1;"></canvas>
+  <p>
+    <button type="button" onclick="change_weather()" style="position:absolute;z-index:2;">改变天气</button>
+  </p>
   <script src="./lib/webgl-utils.js"></script>
   <script src="./lib/webgl-debug.js"></script>
   <script src="./lib/cuon-utils.js"></script>
   <script src="./lib/cuon-matrix.js"></script>
   <script src="./lib/gl-matrix-min.js" defer></script>
-  <button type="button" onclick="change_crash()" style="position:absolute;z-index:3;">一键爆炸</button>
-  <button type="button" onclick="change_weather()" style="position:absolute;z-index:2;">改变天气</button>
 
 </body>
 
