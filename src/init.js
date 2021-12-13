@@ -4,10 +4,10 @@ function initProgram() {
     const canvas = document.querySelector('#glcanvas');
     const hud = document.querySelector('#hud');
     const gl = canvas.getContext('webgl');
-    var ctx = hud.getContext('2d');
+    const ctx = hud.getContext('2d');
     cw = canvas.clientWidth;
     ch = canvas.clientHeight;
-    if (!gl) {
+    if (!gl || !ctx) {
         alert('Unable to initialize WebGL. Your browser or machine may not support it.');
         return;
     }
@@ -518,6 +518,50 @@ function initProgram() {
       gl_FragColor = vec4(diffuse + ambient, color.a);
     }
   `;
+    const particle_vsSource = `
+    precision mediump float;
+
+    attribute vec3 astart;
+    attribute vec3 aend;
+    attribute float alifetime;
+
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+    uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+    uniform float utime;
+
+    varying float outlifetime;
+    varying float tt;
+    void main() {
+        vec4 pos;
+        tt=alifetime-utime;
+        pos.xyz=astart+(tt*(aend-astart));
+        pos.w=1.0;
+        gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * pos;  //点坐标位置
+        gl_PointSize = 5.0;
+        outlifetime = 1.0-tt;
+        outlifetime = clamp(outlifetime,0.0,1.0);
+      }
+    `;
+    const particle_fsSource = `
+    precision mediump float;
+    varying float outlifetime;
+    varying float tt;
+
+    void main(){
+        if(tt<0.0){
+            discard;
+        }
+        else{
+            float d = distance(gl_PointCoord, vec2(0.5, 0.5));
+            if(d < 0.5) {// Radius is 0.5
+                gl_FragColor.xyz = vec3(0.0, 0.0, 0.0);
+                gl_FragColor.w = outlifetime;
+            }
+            else discard;
+        }
+    }
+    `;
     //初始化着色器程序
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
     const fog_shaderProgram = initShaderProgram(gl, fog_vsSource, fog_fsSource);
@@ -525,6 +569,7 @@ function initProgram() {
     const fogsky_shaderProgram = initShaderProgram(gl, fog_sky_vsSource, fog_sky_fsSource);
     const Texture_shaderProgram = initShaderProgram(gl, Texture_vsSource, Texture_fsSource);
     const fog_Texture_shaderProgram = initShaderProgram(gl, fog_Texture_vsSource, fog_Texture_fsSource);
+    const particle_shaderProgram = initShaderProgram(gl, particle_vsSource, particle_fsSource);
 
     //收集着色器程序会用到的所有信息
     const programInfo = {
@@ -631,6 +676,20 @@ function initProgram() {
             CubeSampler: gl.getUniformLocation(fog_Texture_shaderProgram, 'uCubeSampler')
         },
     };
+    const particle_programInfo = {
+        program: particle_shaderProgram,
+        attribLocations: {
+            start: gl.getAttribLocation(particle_shaderProgram, 'astart'),
+            end: gl.getAttribLocation(particle_shaderProgram, 'aend'),
+            lifetime: gl.getAttribLocation(particle_shaderProgram, 'alifetime'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(particle_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(particle_shaderProgram, 'uViewMatrix'),
+            modelMatrix: gl.getUniformLocation(particle_shaderProgram, 'uModelMatrix'),
+            time:gl.getUniformLocation(particle_shaderProgram, 'utime'),
+        },
+    };
     gl.clearColor(0.5, 0.5, 0.5, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -647,6 +706,7 @@ function initProgram() {
         fogsky_programInfo: fogsky_programInfo,
         Texture_programInfo: Texture_programInfo,
         fog_Texture_programInfo: fog_Texture_programInfo,
+        particle_programInfo: particle_programInfo,
     }
 }
 
@@ -814,6 +874,36 @@ function initTextBuffers(gl, positions, colors, indices, normals, TextCoord) {
         index: indexBuffer,
         normal: normalBuffer,
         TextCoord: TextureBuffer,
+        indices: indices,
+    }
+}
+
+function initParticleBuffers(gl, start, end, lifetime, indices) {
+    //开始顶点缓冲区
+    const startBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, startBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(start), gl.STATIC_DRAW);
+
+    //结束顶点缓冲区
+    const endBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, endBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(end), gl.STATIC_DRAW);
+
+    //生存周期缓冲区
+    const lifeBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, lifeBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lifetime), gl.STATIC_DRAW);
+
+    //索引缓冲区
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+    return {
+        start: startBuffer,
+        end: endBuffer,
+        lifetime: lifeBuffer,
+        index: indexBuffer,
         indices: indices,
     }
 }
@@ -1036,5 +1126,24 @@ function initTextureBall(Program, center, radius, color) {
         }
     }
     const buffers = initTextBuffers(Program.gl, positions, colors, indices, normals, TextCoord);
+    return buffers;
+}
+
+function initBoomParticle(Program, center, startscale, endscale) {
+    var start = new Array();
+    var end = new Array();
+    var lifetime = new Array();
+    var indices = new Array();
+    for (i = 0; i <= 1000; i += 1) {
+        lifetime.push(Math.random());
+        start.push((Math.random() * 2 - 1) * startscale + center[0]);
+        start.push((Math.random() * 2 - 1) * startscale + center[1]);
+        start.push((Math.random() * 2 - 1) * startscale + center[2]);
+        end.push((Math.random() * 2 - 1) * endscale + center[0]);
+        end.push((Math.random() * 2 - 1) * endscale + center[1]);
+        end.push((Math.random() * 2 - 1) * endscale + center[2]);
+        indices.push(i);
+    }
+    const buffers = initParticleBuffers(Program.gl, start, end, lifetime, indices);
     return buffers;
 }
