@@ -1,5 +1,5 @@
-var weather = 0;//0代表晴天，1代表雾天
-
+var weather = 1;//0代表晴天，1代表雾天
+var score = 0;
 var objbuffers = [];
 var objDocArray = [];
 var mtlDocArray = [];
@@ -29,12 +29,22 @@ var nochange_rotation = new Rotation(0, [0, 1, 0]);
 var modelxrotation = new Rotation(Math.PI / 2, [1, 0, 0]);
 var modelyrotation = new Rotation(Math.PI, [0, 1, 0]);
 var modelzrotation = new Rotation(0, [0, 0, 1]);
+function change_weather() {
+    weather = 1 - weather;
+}
 
 window.onload = function () {
 
+    function draw2D(ctx) {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        ctx.font = '18px "Times New Roman"';
+        ctx.fillStyle = 'rgba(255,255,255,1)';
+        ctx.fillText('Current Speed:' + Math.floor(speed * 10) / 10.0, window.innerWidth - 300, window.innerHeight - 100);
+        ctx.fillText('Current Rotation:' + Math.floor(rotation.rad * 100) / 100.0, window.innerWidth - 300, window.innerHeight - 80);
+        ctx.fillText('Current Score:' + Math.floor(score), window.innerWidth - 300, window.innerHeight - 60);
+    }
     function initTextures(Program, gl, filepath, index) {
         var texture = gl.createTexture(); // Create texture
-        // var Sampler = Program.programInfo2.uniformLocations.Sampler;
         var image = new Image(); // Create a image
         image.onload = function () { loadTexture(gl, texture, image, index); };
         image.src = filepath;
@@ -714,6 +724,7 @@ window.onload = function () {
             const modelMatrix6 = setModelMatrix(nochange_translation, nochange_rotation);
 
             requestAnimationFrame(render);
+            draw2D(Program.ctx);
             // draw(Program, Cubebuffer, modelMatrix, projectionMatrix);
             if (mtlDocArray[0] && objDocArray[0]) {
                 getDrawingInfo(Program.gl, objbuffers, objDocArray[0], mtlDocArray[0]);
@@ -721,7 +732,9 @@ window.onload = function () {
                     drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
             }
             if (weather == 0) {
-                drawSkybox(Program, skyboxbuffer,  now / 20, skybox, viewMatrix, projectionMatrix);
+                drawSkybox(Program, skyboxbuffer, now / 20, skybox, viewMatrix, projectionMatrix);
+                // drawSkybox(Program, skyboxbuffer,  0, skybox, viewMatrix, projectionMatrix);
+
                 drawTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
                 drawTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
                 drawTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);

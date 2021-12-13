@@ -2,17 +2,19 @@ function initProgram() {
     //准备webGL的上下文：获取canvas的引用并保存在canvas变量里，并获取webGLRenderingContest并赋值给gl
     //gl会用来引用webGL上下文
     const canvas = document.querySelector('#glcanvas');
+    const hud = document.querySelector('#hud');
     const gl = canvas.getContext('webgl');
+    var ctx = hud.getContext('2d');
     cw = canvas.clientWidth;
     ch = canvas.clientHeight;
     if (!gl) {
         alert('Unable to initialize WebGL. Your browser or machine may not support it.');
         return;
     }
-    canvas.onmousedown = handleMouseDown;
-    canvas.onmouseup = handleMouseUp;
-    canvas.onmousemove = handleMouseMove;
-    canvas.onmouseout = handleMouseOut;
+    hud.onmousedown = handleMouseDown;
+    hud.onmouseup = handleMouseUp;
+    hud.onmousemove = handleMouseMove;
+    hud.onmouseout = handleMouseOut;
     document.onkeydown = handleKeyDown;
     document.onkeyup = handleKeyUp;
 
@@ -638,6 +640,7 @@ function initProgram() {
     return {
         canvas: canvas,
         gl: gl,
+        ctx: ctx,
         programInfo: programInfo,
         fog_programInfo: fog_programInfo,
         sky_programInfo: sky_programInfo,
@@ -748,8 +751,6 @@ function handleKeyDown(event) {
 function handleKeyUp(event) {
     rotation.aixs[0] = 0;
 }
-
-
 
 function initBuffers(gl, positions, colors, indices, normals) {
     //顶点缓冲区
