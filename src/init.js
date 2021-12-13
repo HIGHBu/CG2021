@@ -133,6 +133,7 @@ function initProgram() {
         return f;
     }
     float map(in vec3 p, float oct){
+        //使云朵向前下方移动
         vec3 q = p - vec3(0.0,0.1,1.0) * uTime;
         float g1 = 0.5+0.5*noise_worley( q*0.3 );
         float g2 = 0.5+0.5*noise_worley( q*0.3 );
@@ -143,14 +144,13 @@ function initProgram() {
         
         //f1 * a - 0.75, a越大，起伏细节越多
         f1 = mix( f1*0.1-0.75, f1, g1*g1 ) + 0.1;
-        //f2 * a - 0.75, a越大，云朵的细胞感越强
-        f2 = mix( f2*0.2-0.75, f2, g2*g2 ) + 0.1;
+        //f2 * a - 0.75, a越大，边缘细节越多
+        f2 = mix( f2*0.5-0.75, f2, g2*g2 ) + 0.1;
         
         //float f = 1. - f1 + f2;
-        float f = mix(f1, f2, 0.6);
+        float f = mix(f1, f2, 0.8);
         return 1.5*f - 0.5 - p.y;
     }
-    
     vec3 sundir = normalize(vec3(-1.0,0.0,-1.0));
     const int kDiv = 1; // make bigger for higher quality
     
@@ -182,26 +182,31 @@ function initProgram() {
         for( int i=0; i<100*kDiv; i++ )
         {
            // step size
-           float dt = max(0.1,0.01*t/float(kDiv));
+           float dt = max(0.2,0.01*t/float(kDiv));
     
-           float oct = 3. - log2(1.0+t*0.5);
+           float oct = 1.;
 
            //cloud
            vec3 pos = ro + t*rd;
-           float den = map(pos,oct);
-           if( den > 0.01 ){ // if inside
-               // do lighting
-               float dif = clamp((den - map(pos+0.3 * sundir, oct)) / 0.3, 0.0, 1.0 );
-               vec3  lin = vec3(0.65, 0.65, 0.75) * 1.1 + 0.8 * vec3(1.0, 0.6, 0.3) * dif;
-               vec4  col = vec4(mix(vec3(1.0,0.95,0.8), vec3(0.25,0.3,0.35), den), den);
-               col.xyz *= lin;
-               // fog
-               col.xyz = mix(col.xyz, bgcol, 1.0 - exp2(-0.003 * t * t));
-               // composite front to back
-               col.w    = min(col.w * 8.0 * dt,1.0);
-               col.rgb *= col.a;
-               sum += col*(1.0-sum.a);
-           }
+           if(pos. y > 2.0)
+                break;
+            else{
+                float den = map(pos,oct);
+                if( den > 0.01 ){ // if inside
+                    // do lighting
+                    float dif = clamp((den - map(pos+0.3 * sundir, oct)) / 0.3, 0.0, 1.0 );
+                    vec3  lin = vec3(0.65, 0.65, 0.75) * 1.1 + 0.8 * vec3(1.0, 0.6, 0.3) * dif;
+                    vec4  col = vec4(mix(vec3(1.0,0.95,0.8), vec3(0.25,0.3,0.35), den), den);
+                    col.xyz *= lin;
+                    // fog
+                    col.xyz = mix(col.xyz, bgcol, 1.0 - exp2(-0.003 * t * t));
+                    // composite front to back
+                    col.w    = min(col.w * 8.0 * dt,1.0);
+                    col.rgb *= col.a;
+                    sum += col*(1.0-sum.a);
+                }
+     
+            }
            // advance ray
            t += dt;
            // until far clip or full opacity
@@ -234,7 +239,6 @@ function initProgram() {
     }
 
     void main() {
-      vec2 p = (2.0*gl_FragCoord.xy-uResolution.xy)/uResolution.y;
 
       vec3 cu = normalize(uTargetPosition - uEyePosition);
       vec3 cv = normalize(uUp);
@@ -242,8 +246,11 @@ function initProgram() {
       mat3 ca = mat3(cu, cv, cw);
       // ray
       vec3 rd = ca * normalize(vTextureCoord);
-      
+    //   if(vTextureCoord.y > -3.0)
+    //     gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
+    //   else
       gl_FragColor = render(uEyePosition, normalize(vTextureCoord));
+
       // gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
     }
   `;
