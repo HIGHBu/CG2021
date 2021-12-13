@@ -10,16 +10,19 @@ var frame = 0;  // 帧数
 var fps_time = 0;   // 用于计算帧数的时间
 var show_frame;
 
+var crashObjSet = [];   // 碰撞物体
+var planeSize = 0.6;
+
 var eye = [0, 0, 6];
 var target = [0, 0, 0];
 var up = [0, 2, 0];
 var cw = 0.0;
 var ch = 0.0;
 
-var speed = 1;
+var speed = 0;
 var del = 0.1;
-var translation = [0, 0, 0];
-var nochange_translation = [0, 0, -6];
+var translation = [0, 0, 0];            // 飞机的平移矩阵
+var nochange_translation = [0, 0, -10];  // 物体的平移矩阵
 var lightColor = [1.0, 1.0, 1.0];
 var ambientLight = [0.4, 0.4, 0.4];
 var lightDirection = [0, 1, -1];
@@ -758,6 +761,36 @@ window.onload = function () {
         return projectionMatrix;
     }
 
+    class crashObj {
+        constructor(center, dx, dy, dz){
+            this.center = center;
+            this.dx = dx;
+            this.dy = dy;
+            this.dz = dz;
+        }
+        check(px, py, pz) {
+            return (Math.abs(this.center[0] - translation[0]) < px + (this.dx + nochange_translation[0])) &&
+                   (Math.abs(this.center[1] - translation[1]) < py + (this.dy + nochange_translation[1])) &&
+                   (Math.abs(this.center[2] - translation[2]) < pz + (this.dz + nochange_translation[2]));
+        }
+    }
+
+    // 碰撞检测: crash - 坠毁标志
+    function checkCollision() {
+        if(crash) return;
+        // 遍历所有obj
+        var px = Math.abs(2.5 * planeSize * Math.cos(rotation.rad));
+        var py = Math.abs(planeSize * Math.sin(rotation.rad));
+        for(let i=0; i<crashObjSet.length; i++) {
+            if(crashObjSet[i].check(px, py, 2 * planeSize)) {
+                speed = 0;
+                crash = 1 - crash;
+                boom_time = 0;
+                break;
+            }
+        }
+    }
+
     show();
 
     function show() {
@@ -776,18 +809,25 @@ window.onload = function () {
         var size = [3, 4, 5];
         var color = [1, 0, 0, 1];
         var center1 = [0.0, 0.0, 0.0];
-        var center2 = [0.5, 0.0, 0.0];
-        var center3 = [0.0, 0.5, 0.0];
-        var center4 = [2.0, 2.0, 0.0];
-        var center5 = [2.0, 1.0, 0.0];
-        var radius1 = 0.2;
-        var radius2 = 0.15;
-        var radius3 = 0.15;
-        var radius4 = 0.1;
-        var color1 = [220 / 255.0, 47 / 255.0, 31 / 255.0, 1.0];//Red
-        var color2 = [80 / 255.0, 24 / 255.0, 21 / 255.0, 1.0];//Black
-        var color3 = [60 / 255.0, 107 / 255.0, 176 / 255.0, 1.0];//Blue
-        var color4 = [239 / 255.0, 169 / 255.0, 13 / 255.0, 1.0];//Yellow
+        var center2 = [2.0, 0.0, 0.0];
+        var center3 = [0.0, 2.0, 0.0];
+        var center4 = [6.0, 4.0, 0.0];
+        // var center5 = [4.0, 2.0, 0.0];
+        var radius1 = 0.8;
+        var radius2 = 0.6;
+        var radius3 = 0.6;
+        var radius4 = 0.4;
+
+        // crashObjSet
+        crashObjSet.push(new crashObj(center1, radius1, radius1, radius1));
+        crashObjSet.push(new crashObj(center2, radius2, radius2, radius2));
+        crashObjSet.push(new crashObj(center3, radius3, radius3, radius3));
+        crashObjSet.push(new crashObj(center4, radius4, radius4, radius4));
+
+        var color1 = [220 / 255.0, 47 / 255.0, 31 / 255.0, 1.0];    //Red
+        var color2 = [80 / 255.0, 24 / 255.0, 21 / 255.0, 1.0];     //Black
+        var color3 = [60 / 255.0, 107 / 255.0, 176 / 255.0, 1.0];   //Blue
+        var color4 = [239 / 255.0, 169 / 255.0, 13 / 255.0, 1.0];   //Yellow
         var text_filepath1 = '../res/sun.jpg';
         var text_filepath2 = '../res/mercury.jpg';
         var text_filepath3 = '../res/earth.jpg';
@@ -801,7 +841,7 @@ window.onload = function () {
         const particlebuffer = initBoomParticle(Program, center, 1.5, 0.5);
         const skyboxbuffer = initSkybox(Program);
 
-        LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objDocArray, mtlDocArray, 0.8, false);
+        LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objDocArray, mtlDocArray, planeSize, false);
         //LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, false);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
@@ -813,7 +853,9 @@ window.onload = function () {
         var then = 0;
         // Draw the scene repeatedly
         function render(now) {
-
+            checkCollision();
+            console.log("translation: [" + translation[0] + "," + translation[1] + "," + translation[2] + "]");
+            console.log("rotation.rad: " + rotation.rad);
             now *= 0.001;  // convert to seconds
             const deltaTime = now - then;
             then = now;
@@ -859,6 +901,7 @@ window.onload = function () {
                 drawfogTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
             }
             nochange_translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
+            // translation[2] -= deltaTime * speed;
         }
         requestAnimationFrame(render);
     }
