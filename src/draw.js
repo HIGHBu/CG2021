@@ -25,7 +25,7 @@ var translation = [0, 0, 0];            // 飞机的平移矩阵
 var nochange_translation = [0, 0, -10];  // 物体的平移矩阵
 var lightColor = [1.0, 1.0, 1.0];
 var ambientLight = [0.4, 0.4, 0.4];
-var lightDirection = [0, 1, -1];
+var lightDirection = [-1, 0, -1];
 var fogdenisty = 0.3;
 
 var Rotation = function (rad, axis) {
@@ -143,7 +143,7 @@ window.onload = function () {
             Program.sky_programInfo.uniformLocations.up,
             upPosition);
         Program.gl.uniform3fv(
-            Program.sky_programInfo.uniformLocations.uLightDirection,
+            Program.sky_programInfo.uniformLocations.lightDirection,
             lightDirection);
         Program.gl.uniform1f(
             Program.sky_programInfo.uniformLocations.time,

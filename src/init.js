@@ -126,12 +126,12 @@ function initProgram() {
         float f = 0.0;
         p = 2. * p;
         float a = 2.;
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 5; i++) {
             f += a * noise_perlin(p);
             p = 2.0 * p;
             a /= 2.;
         }
-        // f = sin(f + p.x/1000.0);
+        //f = sin(f + p.x/1000.0);
     
         return f;
     }
@@ -139,6 +139,7 @@ function initProgram() {
         //使云朵向前下方移动
         vec3 q = p - vec3(0.0,0.1,1.0) * uTime;
         float g1 = 0.5+0.5*noise_worley( q*0.3 );
+        //q系数越大，起伏越大
         float g2 = 0.5+0.5*noise_worley( q*0.3 );
         
         float f1, f2;
@@ -146,15 +147,15 @@ function initProgram() {
         f2 = noise_worley_fbm_abs(q * oct);
         
         //f1 * a - 0.75, a越大，起伏细节越多
-        f1 = mix( f1*0.1-0.75, f1, g1*g1 ) + 0.1;
+        f1 = mix( f1*0.3-0.75, f1, g1*g1 ) + 0.3;
         //f2 * a - 0.75, a越大，边缘细节越多
-        f2 = mix( f2*0.5-0.75, f2, g2*g2 ) + 0.1;
+        f2 = mix( f2*0.1-0.75, f2, g2*g2 ) + 0.2;
         
         //float f = 1. - f1 + f2;
-        float f = mix(f1, f2, 0.8);
+        float f = mix(f1, f2, 0.9);
         return 1.5*f - 0.5 - p.y;
     }
-    vec3 sundir = normalize(vec3(-1.0,0.0,-1.0));
+    vec3 sundir = normalize(uLightDirection);
     const int kDiv = 1; // make bigger for higher quality
     
     vec4 raymarch( in vec3 ro, in vec3 rd, in vec3 bgcol){
@@ -162,14 +163,14 @@ function initProgram() {
         const float y_bottom = -6.0;
         const float y_top =  6.0;
         //rd本身被归一化，分量小于1，用除法，使得步进范围大
-        float t_bottom = 10. * (y_bottom-ro.y)/rd.y;
-        float t_top = 10. * (y_top-ro.y)/rd.y;
+        float t_bottom = 5. * (y_bottom-ro.y)/rd.y;
+        float t_top = 5. * (y_top-ro.y)/rd.y;
     
         // 确认需要ray march的区域
         float tmin, tmax;
 
             tmin = 0.0;
-            tmax = 1000.0;
+            tmax = 50.0;
             // t_bottom为正表示视线朝下
             if(t_bottom > 0.0)
                 tmax = min(tmax, t_bottom);
@@ -182,16 +183,16 @@ function initProgram() {
         
         // raymarch loop
         vec4 sum = vec4(0.0);
-        for( int i=0; i<100*kDiv; i++ )
+        for( int i=0; i<50*kDiv; i++ )
         {
            // step size
-           float dt = max(0.2,0.01*t/float(kDiv));
+           float dt = max(0.3,0.1*t/float(kDiv));
     
            float oct = 1.;
 
            //cloud
            vec3 pos = ro + t*rd;
-           if(pos. y > 2.0)
+           if(pos. y > y_top)
                 break;
             else{
                 float den = map(pos,oct);
