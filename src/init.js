@@ -293,15 +293,21 @@ function initProgram() {
     attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
     attribute vec4 aNormal; //法向量
     attribute vec2 aTextCoord; //纹理
+    attribute vec4 aAmbientLight; //环境光
+    attribute vec4 adiffuse_Color; //材质颜色
+    attribute vec4 aspecular_Color; //材质颜色
 
     uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
     uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
     uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
     uniform mat4 uReverseModelMatrix; //模型矩阵的逆转置
 
+    varying vec4 vAmbientLight; //环境光
     varying vec3 v_Normal;
     varying vec4 v_Position;
     varying vec2 v_TextCoord;
+    varying vec4 vdiffuse_Color;
+    varying vec4 vspecular_Color;
 
     void main() {
         gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;  //点坐标位置
@@ -310,6 +316,9 @@ function initProgram() {
         //变化后的坐标 -> 世界坐标
         v_Position = uModelMatrix * aVertexPosition;
         v_TextCoord = aTextCoord;
+        vAmbientLight = aAmbientLight;
+        vdiffuse_Color = adiffuse_Color;
+        vspecular_Color = aspecular_Color;
     }
   `;
     //定义纹理片段着色器
@@ -318,26 +327,61 @@ function initProgram() {
     uniform sampler2D uSampler;
     uniform vec3 uLightColor; //光颜色强度
     uniform vec3 uLightDirection; //光线方向
-
-    uniform vec3 uAmbientLight; // 环境光
+    uniform vec3 uEyePosition; //视点位置
+    uniform float uRoughness, uFresnel;
     
+    varying vec4 vdiffuse_Color;
+    varying vec4 vspecular_Color;
+    varying vec4 vAmbientLight; //环境光
     varying vec3 v_Normal;
     varying vec4 v_Position;
     varying vec2 v_TextCoord;
     
+    float cookTorrance(vec3 viewDirection, 
+        vec3 lightDirection,
+        vec3 vNomral,
+        float roughness,
+        float fresnel){
+          float VdotN = max(dot(viewDirection, vNomral), 0.0);
+          float LdotN = max(dot(lightDirection, vNomral), 0.000001);
+          vec3 h = normalize(viewDirection + lightDirection);
+
+          //Geometric term, Gb = 2(nh)(nv)/vh, Gc = 2(nh)(nl)/lh, G = min(1, Gb, Gc)
+          float NdotH = max(dot(h, vNomral), 0.0);
+          float VdotH = max(dot(h, viewDirection), 0.0);
+          float LdotH = max(dot(h, lightDirection), 0.0);
+          float G = min(1.0, min(2.0 * NdotH * VdotN / VdotH, 2.0 * NdotH * LdotN / LdotH));
+
+          //Distribution term
+          float D = exp((NdotH * NdotH - 1.0) / (roughness * roughness * NdotH * NdotH)) / (3.14159265 * roughness * roughness * NdotH * NdotH * NdotH * NdotH);
+
+          //Fresnel term
+          float F = pow(1.0 - VdotN, fresnel);
+
+          return max(G * F * D / max(3.14159265 * VdotN * LdotN, 0.000001), 0.0);
+    }
+
     void main() {
         //纹理作为颜色传入
-        vec4 v_Color=texture2D(uSampler,v_TextCoord);
+        vec4 v_Color = texture2D(uSampler,v_TextCoord);
         //视线方向并归一化
-
+        vec3 viewDirection = normalize(uEyePosition - vec3(v_Position));
         vec3 lightDirection = normalize(uLightDirection);
+
+        vec3 specular = vec3(vspecular_Color) * v_Color.rgb * cookTorrance(viewDirection, 
+            lightDirection,
+            v_Normal,
+            uRoughness,
+            uFresnel
+            );
         //计算cos入射角 当角度大于90 说明光照在背面 赋值为0
         float nDotLight = max(dot(lightDirection, v_Normal), 0.0);
         //计算漫反射光颜色
-        vec3 diffuse = uLightColor * v_Color.rgb * nDotLight;
+        vec3 diffuse = vec3(vdiffuse_Color) * v_Color.rgb * nDotLight;
         // 环境反射光颜色
-        vec3 ambient = uAmbientLight * v_Color.rgb;
-        gl_FragColor = vec4(diffuse + ambient, v_Color.a);
+        vec3 ambient = vec3(vAmbientLight) * v_Color.rgb;
+        vec3 light = mix(diffuse, specular, 0.6);
+        gl_FragColor = vec4(light + ambient, v_Color.a);
     }
   `;
     //定义雾天纹理顶点着色器
@@ -643,6 +687,9 @@ function initProgram() {
         program: Texture_shaderProgram,
         attribLocations: {
             vertexPosition: gl.getAttribLocation(Texture_shaderProgram, 'aVertexPosition'),
+            ambientLight: gl.getAttribLocation(Texture_shaderProgram, 'aAmbientLight'),
+            diffuse_color: gl.getAttribLocation(Texture_shaderProgram, 'adiffuse_Color'),
+            specular_color: gl.getAttribLocation(Texture_shaderProgram, 'aspecular_Color'),
             normal: gl.getAttribLocation(Texture_shaderProgram, 'aNormal'),
             TextCoord: gl.getAttribLocation(Texture_shaderProgram, 'aTextCoord'),
         },
@@ -654,7 +701,11 @@ function initProgram() {
             Sampler: gl.getUniformLocation(Texture_shaderProgram, 'uSampler'),
             lightColor: gl.getUniformLocation(Texture_shaderProgram, 'uLightColor'),
             lightDirection: gl.getUniformLocation(Texture_shaderProgram, 'uLightDirection'),
-            ambient: gl.getUniformLocation(Texture_shaderProgram, 'uAmbientLight'),
+            eyePosition: gl.getUniformLocation(Texture_shaderProgram, 'uEyePosition'),
+            roughness: gl.getUniformLocation(Texture_shaderProgram, 'uRoughness'),
+            fresnel: gl.getUniformLocation(Texture_shaderProgram, 'uFresnel'),
+          
+            // ambient: gl.getUniformLocation(Texture_shaderProgram, 'uAmbientLight'),
         },
     };
     const fog_Texture_programInfo = {
@@ -861,16 +912,20 @@ function initBuffers(gl, positions, colors, indices, normals) {
     }
 }
 
-function initTextBuffers(gl, positions, colors, indices, normals, TextCoord) {
+function initTextBuffers(gl, positions, diffuse_colors, specular_colors, indices, normals, TextCoord, ambientLights) {
     //顶点缓冲区
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
     //为颜色创建缓冲区
-    const colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+    const specular_colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, specular_colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(specular_colors), gl.STATIC_DRAW);
+    //为颜色创建缓冲区
+    const diffuse_colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, diffuse_colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(diffuse_colors), gl.STATIC_DRAW);
 
     //索引缓冲区
     const indexBuffer = gl.createBuffer();
@@ -887,12 +942,19 @@ function initTextBuffers(gl, positions, colors, indices, normals, TextCoord) {
     gl.bindBuffer(gl.ARRAY_BUFFER, TextureBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TextCoord), gl.STATIC_DRAW);
 
+    //环境光缓冲区
+    const ambientLightBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, ambientLightBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(ambientLights), gl.STATIC_DRAW);
+
     return {
         position: positionBuffer,
-        color: colorBuffer,
+        diffuse_color: diffuse_colorBuffer,
+        specular_color: specular_colorBuffer,
         index: indexBuffer,
         normal: normalBuffer,
         TextCoord: TextureBuffer,
+        ambientLight: ambientLightBuffer,
         indices: indices,
     }
 }
@@ -1112,10 +1174,7 @@ function initTextureBall(Program, center, radius, color) {
     var colors = new Array();
     for (i = 0; i <= 180; i += 1) {
         for (j = 0; j <= 360; j += 1) {
-            colors.push(color[0]);  //R
-            colors.push(color[1]);  //G
-            colors.push(color[2]);  //B
-            colors.push(color[3]);  //Alpha
+            colors.push(1, 1, 1, 1);
         }
     }
     var indices = new Array();

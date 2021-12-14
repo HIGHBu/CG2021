@@ -45,161 +45,245 @@ function change_crash() {
     crash = 1 - crash;
     boom_time = 0;
 }
-window.onload = function () {
-
-    function draw2D(ctx) {
+function draw2D(ctx) {
         
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        frame++;
-        var curTime = new Date().getTime();
-        if (curTime - fps_time > 1000) {
-            fps_time = curTime;
-            show_frame=frame;
-            frame = 0;
-        }
-        ctx.font = '18px "Times New Roman"';
-        ctx.fillStyle = 'rgba(255,255,255,1)';
-        ctx.fillText('Current Speed:' + Math.floor(speed * 10) / 10.0, window.innerWidth - 300, window.innerHeight - 100);
-        ctx.fillText('Current Rotation:' + Math.floor(rotation.rad * 100) / 100.0, window.innerWidth - 300, window.innerHeight - 80);
-        ctx.fillText('Current Score:' + Math.floor(score), window.innerWidth - 300, window.innerHeight - 60);
-        ctx.fillText("FPS: " + show_frame, 50, 20);
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    frame++;
+    var curTime = new Date().getTime();
+    if (curTime - fps_time > 1000) {
+        fps_time = curTime;
+        show_frame=frame;
+        frame = 0;
     }
-    function initTextures(Program, gl, filepath, index) {
-        var texture = gl.createTexture(); // Create texture
-        var image = new Image(); // Create a image
-        image.onload = function () { loadTexture(gl, texture, image, index); };
-        image.src = filepath;
-        return true;
-    }
+    ctx.font = '18px "Times New Roman"';
+    ctx.fillStyle = 'rgba(255,255,255,1)';
+    ctx.fillText('Current Speed:' + Math.floor(speed * 10) / 10.0, window.innerWidth - 300, window.innerHeight - 100);
+    ctx.fillText('Current Rotation:' + Math.floor(rotation.rad * 100) / 100.0, window.innerWidth - 300, window.innerHeight - 80);
+    ctx.fillText('Current Score:' + Math.floor(score), window.innerWidth - 300, window.innerHeight - 60);
+    ctx.fillText("FPS: " + show_frame, 50, 20);
+}
+function initTextures(Program, gl, filepath, index) {
+    var texture = gl.createTexture(); // Create texture
+    var image = new Image(); // Create a image
+    image.onload = function () { loadTexture(gl, texture, image, index); };
+    image.src = filepath;
+    return true;
+}
 
-    function loadTexture(gl, texture, image, index) {
-        //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
-        gl.activeTexture(gl.TEXTURE0 + index);
+function loadTexture(gl, texture, image, index) {
+    //gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1);
+    gl.activeTexture(gl.TEXTURE0 + index);
 
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
-        // Check if the image is a power of 2 in both dimensions.
-        if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
-            // Yes, it's a power of 2. Generate mips.
-            gl.generateMipmap(gl.TEXTURE_2D);
-        }
-        else {
-            // No, it's not a power of 2. Turn of mips and set wrapping to clamp to edge
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        }
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+    // Check if the image is a power of 2 in both dimensions.
+    if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+        // Yes, it's a power of 2. Generate mips.
+        gl.generateMipmap(gl.TEXTURE_2D);
     }
+    else {
+        // No, it's not a power of 2. Turn of mips and set wrapping to clamp to edge
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+}
 
-    //天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
-    function drawSkybox(Program, buffer, time, skybox, viewMatrix, projectionMatrix) {
-        {
-            const numComponents = 3;//每次取出3个数值
-            const type = Program.gl.FLOAT;//取出数据为浮点数类型
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.textureCoord);
-            Program.gl.vertexAttribPointer(
-                Program.sky_programInfo.attribLocations.textureCoord,
-                numComponents,
-                type,
-                normalize,
-                stride,
-                offset);
-            Program.gl.enableVertexAttribArray(
-                Program.sky_programInfo.attribLocations.textureCoord);
-        }
-        // Tell WebGL which indices to use to index the vertices
-        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffer.index);
-        //webGL使用此程序进行绘制
-        Program.gl.useProgram(Program.sky_programInfo.program);
-        //Program.gl.activeTexture(gl.TEXTURE0);
-        Program.gl.bindTexture(Program.gl.TEXTURE_CUBE_MAP, skybox);
-        // Tell the shader we bound the texture to texture unit 0
-        Program.gl.uniform1i(Program.sky_programInfo.uniformLocations.uSampler, 0);
-        Program.gl.uniformMatrix4fv(
-            Program.sky_programInfo.uniformLocations.projectionMatrix,
-            false,
-            projectionMatrix);
-        Program.gl.uniformMatrix4fv(
-            Program.sky_programInfo.uniformLocations.viewMatrix,
-            false,
-            viewMatrix);
-        const resolution = vec2.fromValues(cw, ch);
-        Program.gl.uniform2fv(
-            Program.sky_programInfo.uniformLocations.uResolution,
-            resolution);
-        const eyePosition = vec3.fromValues(eye[0], eye[1], eye[2]);
-        Program.gl.uniform3fv(
-            Program.sky_programInfo.uniformLocations.eyePosition,
-            eyePosition);
-        const targetPosition = vec3.fromValues(target[0], target[1], target[2]);
-        Program.gl.uniform3fv(
-            Program.sky_programInfo.uniformLocations.targetPosition,
-            targetPosition);
-        const upPosition = vec3.fromValues(up[0], up[1], up[2]);
-        Program.gl.uniform3fv(
-            Program.sky_programInfo.uniformLocations.up,
-            upPosition);
-        Program.gl.uniform3fv(
-            Program.sky_programInfo.uniformLocations.lightDirection,
-            lightDirection);
-        Program.gl.uniform1f(
-            Program.sky_programInfo.uniformLocations.time,
-            time);
-        {
-            const offset = 0;
-            const type = Program.gl.UNSIGNED_SHORT;
-            const vertexCount = 36;
-            //按连续的三角形方式以此按点绘制
-            Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
-        }
+//天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
+function drawSkybox(Program, buffer, time, skybox, viewMatrix, projectionMatrix) {
+    {
+        const numComponents = 3;//每次取出3个数值
+        const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.textureCoord);
+        Program.gl.vertexAttribPointer(
+            Program.sky_programInfo.attribLocations.textureCoord,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        Program.gl.enableVertexAttribArray(
+            Program.sky_programInfo.attribLocations.textureCoord);
     }
+    // Tell WebGL which indices to use to index the vertices
+    Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffer.index);
+    //webGL使用此程序进行绘制
+    Program.gl.useProgram(Program.sky_programInfo.program);
+    //Program.gl.activeTexture(gl.TEXTURE0);
+    Program.gl.bindTexture(Program.gl.TEXTURE_CUBE_MAP, skybox);
+    // Tell the shader we bound the texture to texture unit 0
+    Program.gl.uniform1i(Program.sky_programInfo.uniformLocations.uSampler, 0);
+    Program.gl.uniformMatrix4fv(
+        Program.sky_programInfo.uniformLocations.projectionMatrix,
+        false,
+        projectionMatrix);
+    Program.gl.uniformMatrix4fv(
+        Program.sky_programInfo.uniformLocations.viewMatrix,
+        false,
+        viewMatrix);
+    const resolution = vec2.fromValues(cw, ch);
+    Program.gl.uniform2fv(
+        Program.sky_programInfo.uniformLocations.uResolution,
+        resolution);
+    const eyePosition = vec3.fromValues(eye[0], eye[1], eye[2]);
+    Program.gl.uniform3fv(
+        Program.sky_programInfo.uniformLocations.eyePosition,
+        eyePosition);
+    const targetPosition = vec3.fromValues(target[0], target[1], target[2]);
+    Program.gl.uniform3fv(
+        Program.sky_programInfo.uniformLocations.targetPosition,
+        targetPosition);
+    const upPosition = vec3.fromValues(up[0], up[1], up[2]);
+    Program.gl.uniform3fv(
+        Program.sky_programInfo.uniformLocations.up,
+        upPosition);
+    Program.gl.uniform3fv(
+        Program.sky_programInfo.uniformLocations.lightDirection,
+        lightDirection);
+    Program.gl.uniform1f(
+        Program.sky_programInfo.uniformLocations.time,
+        time);
+    {
+        const offset = 0;
+        const type = Program.gl.UNSIGNED_SHORT;
+        const vertexCount = 36;
+        //按连续的三角形方式以此按点绘制
+        Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
+    }
+}
 
-    //雾天天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
-    function drawfogSkybox(Program, buffer, skybox, viewMatrix, projectionMatrix) {
-        {
-            const numComponents = 3;//每次取出3个数值
-            const type = Program.gl.FLOAT;//取出数据为浮点数类型
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.textureCoord);
-            Program.gl.vertexAttribPointer(
-                Program.fogsky_programInfo.attribLocations.textureCoord,
-                numComponents,
-                type,
-                normalize,
-                stride,
-                offset);
-            Program.gl.enableVertexAttribArray(
-                Program.fogsky_programInfo.attribLocations.textureCoord);
-        }
-        // Tell WebGL which indices to use to index the vertices
-        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffer.index);
-        //webGL使用此程序进行绘制
-        Program.gl.useProgram(Program.fogsky_programInfo.program);
-        //Program.gl.activeTexture(gl.TEXTURE0);
-        Program.gl.bindTexture(Program.gl.TEXTURE_CUBE_MAP, skybox);
-        // Tell the shader we bound the texture to texture unit 0
-        Program.gl.uniform1i(Program.fogsky_programInfo.uniformLocations.uSampler, 0);
-        Program.gl.uniformMatrix4fv(
-            Program.fogsky_programInfo.uniformLocations.projectionMatrix,
-            false,
-            projectionMatrix);
-        Program.gl.uniformMatrix4fv(
-            Program.fogsky_programInfo.uniformLocations.viewMatrix,
-            false,
-            viewMatrix);
-        {
-            const offset = 0;
-            const type = Program.gl.UNSIGNED_SHORT;
-            const vertexCount = 36;
-            //按连续的三角形方式以此按点绘制
-            Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
-        }
+//雾天天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
+function drawfogSkybox(Program, buffer, skybox, viewMatrix, projectionMatrix) {
+    {
+        const numComponents = 3;//每次取出3个数值
+        const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.textureCoord);
+        Program.gl.vertexAttribPointer(
+            Program.fogsky_programInfo.attribLocations.textureCoord,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        Program.gl.enableVertexAttribArray(
+            Program.fogsky_programInfo.attribLocations.textureCoord);
     }
+    // Tell WebGL which indices to use to index the vertices
+    Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffer.index);
+    //webGL使用此程序进行绘制
+    Program.gl.useProgram(Program.fogsky_programInfo.program);
+    //Program.gl.activeTexture(gl.TEXTURE0);
+    Program.gl.bindTexture(Program.gl.TEXTURE_CUBE_MAP, skybox);
+    // Tell the shader we bound the texture to texture unit 0
+    Program.gl.uniform1i(Program.fogsky_programInfo.uniformLocations.uSampler, 0);
+    Program.gl.uniformMatrix4fv(
+        Program.fogsky_programInfo.uniformLocations.projectionMatrix,
+        false,
+        projectionMatrix);
+    Program.gl.uniformMatrix4fv(
+        Program.fogsky_programInfo.uniformLocations.viewMatrix,
+        false,
+        viewMatrix);
+    {
+        const offset = 0;
+        const type = Program.gl.UNSIGNED_SHORT;
+        const vertexCount = 36;
+        //按连续的三角形方式以此按点绘制
+        Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
+    }
+}
+
+function drawParticle(Program, buffers, time, modelMatrix, viewMatrix, projectionMatrix) {
+    //为webGL设置从缓冲区抽取start数据的属性值，将其放入着色器信息
+    {
+        const numComponents = 3;//每次取出3个数值
+        const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.start);
+        Program.gl.vertexAttribPointer(
+            Program.particle_programInfo.attribLocations.start,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        Program.gl.enableVertexAttribArray(
+            Program.particle_programInfo.attribLocations.start);
+    }
+    //为webGL设置从缓冲区抽取end数据的属性值，将其放入着色器信息
+    {
+        const numComponents = 3;//每次取出3个数值
+        const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.end);
+        Program.gl.vertexAttribPointer(
+            Program.particle_programInfo.attribLocations.end,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        Program.gl.enableVertexAttribArray(
+            Program.particle_programInfo.attribLocations.end);
+    }//为webGL设置从缓冲区抽取lifetime数据的属性值，将其放入着色器信息
+    {
+        const numComponents = 1;//每次取出1个数值
+        const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.lifetime);
+        Program.gl.vertexAttribPointer(
+            Program.particle_programInfo.attribLocations.lifetime,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        Program.gl.enableVertexAttribArray(
+            Program.particle_programInfo.attribLocations.lifetime);
+    }
+    Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+    //webGL使用此程序进行绘制
+    Program.gl.useProgram(Program.particle_programInfo.program);
+
+    // 设置着色器的uniform型变量
+    Program.gl.uniformMatrix4fv(
+        Program.particle_programInfo.uniformLocations.projectionMatrix,
+        false,
+        projectionMatrix);
+    Program.gl.uniformMatrix4fv(
+        Program.particle_programInfo.uniformLocations.viewMatrix,
+        false,
+        viewMatrix);
+    Program.gl.uniformMatrix4fv(
+        Program.particle_programInfo.uniformLocations.modelMatrix,
+        false,
+        modelMatrix);
+    Program.gl.uniform1f(
+        Program.particle_programInfo.uniformLocations.time,
+        time
+    );
+    {
+        const offset = 0;
+        const type = Program.gl.UNSIGNED_SHORT;
+        const vertexCount = buffers.indices.length;
+        //按连续的点方式以此按点绘制
+        Program.gl.drawElements(Program.gl.POINTS, vertexCount, type, offset);
+    }
+}
+
+window.onload = function () {
 
     function draw(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
         //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
@@ -469,6 +553,74 @@ window.onload = function () {
             Program.gl.enableVertexAttribArray(
                 Program.Texture_programInfo.attribLocations.TextCoord);
         }
+        {
+            const numComponents = 4;//每次取出4个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.ambientLight);
+            Program.gl.vertexAttribPointer(
+                Program.Texture_programInfo.attribLocations.ambientLight,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.Texture_programInfo.attribLocations.ambientLight);
+        }
+        {
+            const numComponents = 4;//每次取出4个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.diffuse_color);
+            Program.gl.vertexAttribPointer(
+                Program.Texture_programInfo.attribLocations.diffuse_color,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.Texture_programInfo.attribLocations.diffuse_color);
+        }
+        {
+            const numComponents = 4;//每次取出4个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.specular_color);
+            Program.gl.vertexAttribPointer(
+                Program.Texture_programInfo.attribLocations.specular_color,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.Texture_programInfo.attribLocations.specular_color);
+        }
+        // {
+        //     const numComponents = 4;//每次取出4个数值
+        //     const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        //     const normalize = false;
+        //     const stride = 0;
+        //     const offset = 0;
+        //     Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.color);
+        //     Program.gl.vertexAttribPointer(
+        //         Program.Texture_programInfo.attribLocations.color,
+        //         numComponents,
+        //         type,
+        //         normalize,
+        //         stride,
+        //         offset);
+        //     Program.gl.enableVertexAttribArray(
+        //         Program.Texture_programInfo.attribLocations.color);
+        // }
         // Tell WebGL which indices to use to index the vertices
         Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
 
@@ -501,9 +653,20 @@ window.onload = function () {
         Program.gl.uniform3fv(
             Program.Texture_programInfo.uniformLocations.lightDirection,
             lightDirection);
+        // Program.gl.uniform3fv(
+        //     Program.Texture_programInfo.uniformLocations.ambient,
+        //     ambientLight);
+        var eyePosition = vec3.fromValues(eye[0], eye[1], eye[2]);
         Program.gl.uniform3fv(
-            Program.Texture_programInfo.uniformLocations.ambient,
-            ambientLight);
+            Program.Texture_programInfo.uniformLocations.eyePosition,
+            eyePosition);
+        Program.gl.uniform1f(
+            Program.Texture_programInfo.uniformLocations.roughness,
+            0.3);            
+        Program.gl.uniform1f(
+            Program.Texture_programInfo.uniformLocations.fresnel,
+            0.04);  
+
         Program.gl.uniform1i(
             Program.Texture_programInfo.uniformLocations.Sampler,
             num);
@@ -627,89 +790,6 @@ window.onload = function () {
         }
     }
 
-    function drawParticle(Program, buffers, time, modelMatrix, viewMatrix, projectionMatrix) {
-        //为webGL设置从缓冲区抽取start数据的属性值，将其放入着色器信息
-        {
-            const numComponents = 3;//每次取出3个数值
-            const type = Program.gl.FLOAT;//取出数据为浮点数类型
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.start);
-            Program.gl.vertexAttribPointer(
-                Program.particle_programInfo.attribLocations.start,
-                numComponents,
-                type,
-                normalize,
-                stride,
-                offset);
-            Program.gl.enableVertexAttribArray(
-                Program.particle_programInfo.attribLocations.start);
-        }
-        //为webGL设置从缓冲区抽取end数据的属性值，将其放入着色器信息
-        {
-            const numComponents = 3;//每次取出3个数值
-            const type = Program.gl.FLOAT;//取出数据为浮点数类型
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.end);
-            Program.gl.vertexAttribPointer(
-                Program.particle_programInfo.attribLocations.end,
-                numComponents,
-                type,
-                normalize,
-                stride,
-                offset);
-            Program.gl.enableVertexAttribArray(
-                Program.particle_programInfo.attribLocations.end);
-        }//为webGL设置从缓冲区抽取lifetime数据的属性值，将其放入着色器信息
-        {
-            const numComponents = 1;//每次取出1个数值
-            const type = Program.gl.FLOAT;//取出数据为浮点数类型
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.lifetime);
-            Program.gl.vertexAttribPointer(
-                Program.particle_programInfo.attribLocations.lifetime,
-                numComponents,
-                type,
-                normalize,
-                stride,
-                offset);
-            Program.gl.enableVertexAttribArray(
-                Program.particle_programInfo.attribLocations.lifetime);
-        }
-        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
-        //webGL使用此程序进行绘制
-        Program.gl.useProgram(Program.particle_programInfo.program);
-
-        // 设置着色器的uniform型变量
-        Program.gl.uniformMatrix4fv(
-            Program.particle_programInfo.uniformLocations.projectionMatrix,
-            false,
-            projectionMatrix);
-        Program.gl.uniformMatrix4fv(
-            Program.particle_programInfo.uniformLocations.viewMatrix,
-            false,
-            viewMatrix);
-        Program.gl.uniformMatrix4fv(
-            Program.particle_programInfo.uniformLocations.modelMatrix,
-            false,
-            modelMatrix);
-        Program.gl.uniform1f(
-            Program.particle_programInfo.uniformLocations.time,
-            time
-        );
-        {
-            const offset = 0;
-            const type = Program.gl.UNSIGNED_SHORT;
-            const vertexCount = buffers.indices.length;
-            //按连续的点方式以此按点绘制
-            Program.gl.drawElements(Program.gl.POINTS, vertexCount, type, offset);
-        }
-    }
 
     //设置模型矩阵，translation为模型的平移，rotation为模型的旋转。modelrotation，modelrotation用于模型的方向修正
     function setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation,) {
@@ -886,10 +966,10 @@ window.onload = function () {
                 drawSkybox(Program, skyboxbuffer, now / 20, skybox, viewMatrix, projectionMatrix);
                 // drawSkybox(Program, skyboxbuffer,  0, skybox, viewMatrix, projectionMatrix);
 
-                drawTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
-                drawTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
-                drawTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
-                drawTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
+                // drawTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
+                // drawTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
+                // drawTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
+                // drawTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
             }
             if (weather == 1) {
                 drawfogSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
@@ -912,7 +992,9 @@ function getDrawingInfo(gl, buffers, objDocs, mtlDocs) {
     var indices = new Array(0);
     var normals = new Array(0);
     var textureCoords = new Array(0);
-    var colors = new Array(0);
+    var diffuse_colors = new Array(0);
+    var specular_colors = new Array(0);
+    var ambientLights = new Array(0);
     var numIndices = 0;
     for (var i = 0; i < objDocs.objects.length; i++) {
         numIndices += objDocs.objects[i].numIndices;
@@ -925,8 +1007,17 @@ function getDrawingInfo(gl, buffers, objDocs, mtlDocs) {
         var currentObject = objDocs.objects[i];
         for (var j = 0; j < currentObject.faces.length; j++) {
             var currentFace = currentObject.faces[j];
+            var currentMtl;
+            for(var k = 0; k < mtlDocs.mtls.length; k++)
+                if(mtlDocs.mtls[k].name === currentFace.materialName){
+                    currentMtl = mtlDocs.mtls[k];
+                    break;
+                }
+            
             for (var k = 0; k < currentFace.vIndices.length; k++) {
-                colors.push(0.8, 0.8, 0.8, 1);
+                diffuse_colors.push(currentMtl.Kd.r, currentMtl.Kd.g, currentMtl.Kd.b, 1);
+                specular_colors.push(currentMtl.Ks.r, currentMtl.Ks.g, currentMtl.Ks.b, 1);
+                ambientLights.push(currentMtl.Ka.r, currentMtl.Ka.g, currentMtl.Ka.b, 1);
                 indices.push(index_indices % numIndices);
                 var vIdx = currentFace.vIndices[k];
                 var tIdx = currentFace.tIndices[k];
@@ -944,6 +1035,6 @@ function getDrawingInfo(gl, buffers, objDocs, mtlDocs) {
             }
         }
     }
-    temp = initTextBuffers(gl, positions, colors, indices, normals, textureCoords);
+    temp = initTextBuffers(gl, positions, diffuse_colors, specular_colors, indices, normals, textureCoords, ambientLights);
     buffers.push(temp);
 }
