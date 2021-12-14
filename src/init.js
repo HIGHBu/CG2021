@@ -15,6 +15,7 @@ function initProgram() {
     hud.onmouseup = handleMouseUp;
     hud.onmousemove = handleMouseMove;
     hud.onmouseout = handleMouseOut;
+    hud.addEventListener('wheel',onMouseWheel,false);
     document.onkeydown = handleKeyDown;
     document.onkeyup = handleKeyUp;
 
@@ -809,9 +810,26 @@ function handleKeyDown(event) {
     }
 }
 function handleKeyUp(event) {
-    rotation.aixs[0] = 0;
+    rotation.aixs[0] = 0.0;
 }
-
+function onMouseWheel(event){
+    var distance = Math.pow(eye[0]-target[0], 2)+Math.pow(eye[1]-target[1], 2)+Math.pow(eye[2]-target[2], 2);
+    distance = Math.sqrt(distance);
+    if(event.deltaY>0){
+        if(distance<30){
+            eye[0] = target[0] + (eye[0]-target[0])*(1.0+event.deltaY*0.001);
+            eye[1] = target[1] + (eye[1]-target[1])*(1.0+event.deltaY*0.001);
+            eye[2] = target[2] + (eye[2]-target[2])*(1.0+event.deltaY*0.001);
+        }
+    }
+    else{
+        if(distance>3){
+            eye[0] = target[0] + (eye[0]-target[0])*(1.0+event.deltaY*0.001);
+            eye[1] = target[1] + (eye[1]-target[1])*(1.0+event.deltaY*0.001);
+            eye[2] = target[2] + (eye[2]-target[2])*(1.0+event.deltaY*0.001);
+        }
+    }
+}
 function initBuffers(gl, positions, colors, indices, normals) {
     //顶点缓冲区
     const positionBuffer = gl.createBuffer();

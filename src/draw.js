@@ -854,8 +854,6 @@ window.onload = function () {
         // Draw the scene repeatedly
         function render(now) {
             checkCollision();
-            console.log("translation: [" + translation[0] + "," + translation[1] + "," + translation[2] + "]");
-            console.log("rotation.rad: " + rotation.rad);
             now *= 0.001;  // convert to seconds
             const deltaTime = now - then;
             then = now;
