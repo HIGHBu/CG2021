@@ -769,9 +769,9 @@ window.onload = function () {
             this.dz = dz;
         }
         check(px, py, pz) {
-            return (Math.abs(this.center[0] - translation[0]) < px + (this.dx + nochange_translation[0])) &&
-                   (Math.abs(this.center[1] - translation[1]) < py + (this.dy + nochange_translation[1])) &&
-                   (Math.abs(this.center[2] - translation[2]) < pz + (this.dz + nochange_translation[2]));
+            return (Math.abs(this.center[0] + nochange_translation[0] - translation[0]) < px + this.dx) &&
+                   (Math.abs(this.center[1] + nochange_translation[1] - translation[1]) < py + this.dy) &&
+                   (Math.abs(this.center[2] + nochange_translation[2] - translation[2]) < pz + this.dz);
         }
     }
 
