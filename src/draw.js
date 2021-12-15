@@ -25,8 +25,12 @@ var translation = [0, 0, 0];            // 飞机的平移矩阵
 var nochange_translation = [0, 0, -10];  // 物体的平移矩阵
 var lightColor = [1.0, 1.0, 1.0];
 var ambientLight = [0.4, 0.4, 0.4];
-var lightDirection = [-1, 0, -1];
+var lightDirection = [1.0, 1.0, 0.0];
 var fogdenisty = 0.3;
+
+var light_Scale = 20.0;
+var LIGHT_X = -lightDirection[0] * light_Scale, LIGHT_Y = -lightDirection[1] * light_Scale, LIGHT_Z = -lightDirection[2] * light_Scale;
+
 
 var Rotation = function (rad, axis) {
     this.rad = rad;
@@ -46,13 +50,13 @@ function change_crash() {
     boom_time = 0;
 }
 function draw2D(ctx) {
-        
+
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
     frame++;
     var curTime = new Date().getTime();
     if (curTime - fps_time > 1000) {
         fps_time = curTime;
-        show_frame=frame;
+        show_frame = frame;
         frame = 0;
     }
     ctx.font = '18px "Times New Roman"';
@@ -282,7 +286,75 @@ function drawParticle(Program, buffers, time, modelMatrix, viewMatrix, projectio
         Program.gl.drawElements(Program.gl.POINTS, vertexCount, type, offset);
     }
 }
-
+function drawPlane(Program, buffer, modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight) {
+    {
+        const numComponents = 3;//每次取出3个数值
+        const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.position);
+        Program.gl.vertexAttribPointer(
+            Program.plane_programInfo.attribLocations.vertexPosition,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        Program.gl.enableVertexAttribArray(
+            Program.plane_programInfo.attribLocations.vertexPosition);
+    }
+    //为webGL设置从缓冲区抽取颜色数据的属性值，将其放入着色器信息
+    {
+        const numComponents = 4;//每次取出4个数值
+        const type = Program.gl.FLOAT;//取出数据为浮点数类型
+        const normalize = false;
+        const stride = 0;
+        const offset = 0;
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.color);
+        Program.gl.vertexAttribPointer(
+            Program.plane_programInfo.attribLocations.vertexColor,
+            numComponents,
+            type,
+            normalize,
+            stride,
+            offset);
+        Program.gl.enableVertexAttribArray(
+            Program.plane_programInfo.attribLocations.vertexColor);
+    }
+    // Tell WebGL which indices to use to index the vertices
+    Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffer.index);
+    //webGL使用此程序进行绘制
+    Program.gl.useProgram(Program.plane_programInfo.program);
+    Program.gl.uniform1i(Program.plane_programInfo.uniformLocations.uShadowMap, 7);
+    Program.gl.uniformMatrix4fv(
+        Program.plane_programInfo.uniformLocations.projectionMatrix,
+        false,
+        projectionMatrix);
+    Program.gl.uniformMatrix4fv(
+        Program.plane_programInfo.uniformLocations.viewMatrix,
+        false,
+        viewMatrix);
+    Program.gl.uniformMatrix4fv(
+        Program.plane_programInfo.uniformLocations.projectionMatrixFromLight,
+        false,
+        projectionMatrixFromLight);
+    Program.gl.uniformMatrix4fv(
+        Program.plane_programInfo.uniformLocations.viewMatrixFromLight,
+        false,
+        viewMatrixFromLight);
+    Program.gl.uniformMatrix4fv(
+        Program.plane_programInfo.uniformLocations.modelMatrix,
+        false,
+        modelMatrix);
+    {
+        const offset = 0;
+        const type = Program.gl.UNSIGNED_SHORT;
+        const vertexCount = buffer.indices.length;
+        //按连续的三角形方式以此按点绘制
+        Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
+    }
+}
 window.onload = function () {
 
     function draw(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
@@ -662,10 +734,10 @@ window.onload = function () {
             eyePosition);
         Program.gl.uniform1f(
             Program.Texture_programInfo.uniformLocations.roughness,
-            0.3);            
+            0.3);
         Program.gl.uniform1f(
             Program.Texture_programInfo.uniformLocations.fresnel,
-            0.04);  
+            0.04);
 
         Program.gl.uniform1i(
             Program.Texture_programInfo.uniformLocations.Sampler,
@@ -780,7 +852,7 @@ window.onload = function () {
             fogdenisty);
         Program.gl.uniform1i(
             Program.fog_Texture_programInfo.uniformLocations.CubeSampler,
-            4);//不能是导入其他纹理用到的sampler号
+            5);//不能是导入其他纹理用到的sampler号
         {
             const offset = 0;
             const type = Program.gl.UNSIGNED_SHORT;
@@ -790,6 +862,53 @@ window.onload = function () {
         }
     }
 
+    function drawShadow(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
+
+        //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.position);
+            Program.gl.vertexAttribPointer(
+                Program.shadow_programInfo.attribLocations.vertexPosition,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.shadow_programInfo.attribLocations.vertexPosition);
+        }
+        // Tell WebGL which indices to use to index the vertices
+        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+
+        //webGL使用此程序进行绘制
+        Program.gl.useProgram(Program.shadow_programInfo.program);
+
+        // 设置着色器的uniform型变量
+        Program.gl.uniformMatrix4fv(
+            Program.shadow_programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.shadow_programInfo.uniformLocations.viewMatrix,
+            false,
+            viewMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.shadow_programInfo.uniformLocations.modelMatrix,
+            false,
+            modelMatrix);
+        {
+            const offset = 0;
+            const type = Program.gl.UNSIGNED_SHORT;
+            const vertexCount = buffers.indices.length;
+            //按连续的三角形方式以此按点绘制
+            Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
+        }
+    }
 
     //设置模型矩阵，translation为模型的平移，rotation为模型的旋转。modelrotation，modelrotation用于模型的方向修正
     function setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation,) {
@@ -827,6 +946,17 @@ window.onload = function () {
         return ViewMatrix;
     }
 
+    //设置光看的视角矩阵，根据视点，目标点和上方向确定视角矩阵
+    function setViewMatrixFromLight() {
+        //设置view坐标系
+        var light_eye = [LIGHT_X, LIGHT_Y, LIGHT_Z];
+        var light_target = [0.0, 0.0, 0.0];
+        const ViewMatrix = mat4.create();
+        // mat4.lookAt(ViewMatrix, light_eye, light_target, up);   
+        mat4.lookAt(ViewMatrix, light_eye, target, up);
+        return ViewMatrix;
+    }
+
     function setProjectionMatrix(gl) {
         const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
@@ -841,8 +971,22 @@ window.onload = function () {
         return projectionMatrix;
     }
 
+    function setProjectionMatrixFromLight(gl) {
+        const fieldOfView = 45 * Math.PI / 180;   // in radians
+        const aspect = OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT;
+        const zNear = 0.1;
+        const zFar = 1000.0;
+        const projectionMatrix = mat4.create();
+        mat4.perspective(projectionMatrix,
+            fieldOfView,
+            aspect,
+            zNear,
+            zFar);
+        return projectionMatrix;
+    }
+
     class crashObj {
-        constructor(center, dx, dy, dz){
+        constructor(center, dx, dy, dz) {
             this.center = center;
             this.dx = dx;
             this.dy = dy;
@@ -850,19 +994,19 @@ window.onload = function () {
         }
         check(px, py, pz) {
             return (Math.abs(this.center[0] + nochange_translation[0] - translation[0]) < px + this.dx) &&
-                   (Math.abs(this.center[1] + nochange_translation[1] - translation[1]) < py + this.dy) &&
-                   (Math.abs(this.center[2] + nochange_translation[2] - translation[2]) < pz + this.dz);
+                (Math.abs(this.center[1] + nochange_translation[1] - translation[1]) < py + this.dy) &&
+                (Math.abs(this.center[2] + nochange_translation[2] - translation[2]) < pz + this.dz);
         }
     }
 
     // 碰撞检测: crash - 坠毁标志
     function checkCollision() {
-        if(crash) return;
+        if (crash) return;
         // 遍历所有obj
         var px = Math.abs(2.5 * planeSize * Math.cos(rotation.rad));
         var py = Math.abs(planeSize * Math.sin(rotation.rad));
-        for(let i=0; i<crashObjSet.length; i++) {
-            if(crashObjSet[i].check(px, py, 2 * planeSize)) {
+        for (let i = 0; i < crashObjSet.length; i++) {
+            if (crashObjSet[i].check(px, py, 2 * planeSize)) {
                 speed = 0;
                 crash = 1 - crash;
                 boom_time = 0;
@@ -887,12 +1031,13 @@ window.onload = function () {
         var skybox = loadSkybox(Program.gl, skybox_urls);
         var center = [0, 0, 0];
         var size = [3, 4, 5];
+        var size_plane = [10.0, 10.0];
         var color = [1, 0, 0, 1];
         var center1 = [0.0, 0.0, 0.0];
         var center2 = [2.0, 0.0, 0.0];
         var center3 = [0.0, 2.0, 0.0];
         var center4 = [6.0, 4.0, 0.0];
-        // var center5 = [4.0, 2.0, 0.0];
+        var center5 = [0.0, -1.0, 0.0];
         var radius1 = 0.8;
         var radius2 = 0.6;
         var radius3 = 0.6;
@@ -918,11 +1063,22 @@ window.onload = function () {
         const ballbuffer2 = initTextureBall(Program, center2, radius2, color2);
         const ballbuffer3 = initTextureBall(Program, center3, radius3, color3);
         const ballbuffer4 = initTextureBall(Program, center4, radius4, color4);
-        const particlebuffer = initBoomParticle(Program, center, 1.5, 0.5);
+        const particlebuffer = initBoomParticle(Program, center, 1.2, 0.5);
+        const planebuffer = initPlane(Program, center5, size_plane, color1);
         const skyboxbuffer = initSkybox(Program);
 
         LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objDocArray, mtlDocArray, planeSize, false);
-        //LoadObjFile(Program.gl, '../obj/toy_plane.obj', objbuffers, 0.003, false);
+
+        var fbo = initFramebufferObject(Program.gl);
+        if (!fbo) {
+            console.log('Failed to initialize frame buffer object');
+            return;
+        }
+        Program.gl.activeTexture(Program.gl.TEXTURE7); // Set a texture object to the texture unit
+        Program.gl.bindTexture(Program.gl.TEXTURE_2D, fbo.texture);
+        // Set the clear color and enable the depth test
+        Program.gl.clearColor(0, 0, 0, 1);
+        Program.gl.enable(Program.gl.DEPTH_TEST);
 
         //const objbuffer = initOneObj(Program, objpositions, objcolors, objindices, 0);
         initTextures(Program, Program.gl, text_filepath1, 0);
@@ -939,6 +1095,8 @@ window.onload = function () {
             then = now;
             const projectionMatrix = setProjectionMatrix(Program.gl);
             const viewMatrix = setViewMatrix();
+            const projectionMatrixFromLight = setProjectionMatrixFromLight(Program.gl);
+            const viewMatrixFromLight = setViewMatrixFromLight();
 
             // const modelMatrix = setModelMatrix(translation, rotation);
             const modelMatrix1 = setModelMatrix(nochange_translation, nochange_rotation);
@@ -947,6 +1105,7 @@ window.onload = function () {
             const modelMatrix4 = setModelMatrix(nochange_translation, nochange_rotation);
             const modelMatrix5 = setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation);
             const modelMatrix6 = setModelMatrix(translation, rotation);
+            const modelMatrix7 = setModelMatrix(nochange_translation, nochange_rotation);
 
             requestAnimationFrame(render);
             draw2D(Program.ctx);
@@ -954,8 +1113,20 @@ window.onload = function () {
             if (crash == 0) {
                 if (mtlDocArray[0] && objDocArray[0]) {
                     getDrawingInfo(Program.gl, objbuffers, objDocArray[0], mtlDocArray[0]);
-                    if (objbuffers[0])
+                    if (objbuffers[0]){
+                        Program.gl.bindFramebuffer(Program.gl.FRAMEBUFFER, fbo);               // Change the drawing destination to FBO
+                        Program.gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // Set view port for FBO
+                        Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);   // Clear FBO    
+                        drawShadow(Program, objbuffers[0], modelMatrix5, viewMatrixFromLight, projectionMatrixFromLight);
+                        // drawShadow(Program, ballbuffer1, modelMatrix1, viewMatrixFromLight, projectionMatrixFromLight);
+                        // drawShadow(Program, ballbuffer2, modelMatrix2, viewMatrixFromLight, projectionMatrixFromLight);
+                        // drawShadow(Program, ballbuffer3, modelMatrix3, viewMatrixFromLight, projectionMatrixFromLight);
+                        // drawShadow(Program, ballbuffer4, modelMatrix4, viewMatrixFromLight, projectionMatrixFromLight);
+                        Program.gl.bindFramebuffer(Program.gl.FRAMEBUFFER, null);               // Change the drawing destination to color buffer
+                        Program.gl.viewport(0, 0, cw, ch);
+                        Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);    // Clear color and depth buffer
                         drawTexture(Program, objbuffers[0], modelMatrix5, viewMatrix, projectionMatrix, 4);
+                    }
                 }
             }
             else {
@@ -973,10 +1144,11 @@ window.onload = function () {
             }
             if (weather == 1) {
                 drawfogSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
-                drawfogTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
-                drawfogTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
-                drawfogTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
-                drawfogTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
+                drawPlane(Program, planebuffer, modelMatrix7, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                // drawfogTexture(Program, ballbuffer1, modelMatrix1, viewMatrix, projectionMatrix, 0);
+                // drawfogTexture(Program, ballbuffer2, modelMatrix2, viewMatrix, projectionMatrix, 1);
+                // drawfogTexture(Program, ballbuffer3, modelMatrix3, viewMatrix, projectionMatrix, 2);
+                // drawfogTexture(Program, ballbuffer4, modelMatrix4, viewMatrix, projectionMatrix, 3);
             }
             nochange_translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
             // translation[2] -= deltaTime * speed;
@@ -1008,12 +1180,12 @@ function getDrawingInfo(gl, buffers, objDocs, mtlDocs) {
         for (var j = 0; j < currentObject.faces.length; j++) {
             var currentFace = currentObject.faces[j];
             var currentMtl;
-            for(var k = 0; k < mtlDocs.mtls.length; k++)
-                if(mtlDocs.mtls[k].name === currentFace.materialName){
+            for (var k = 0; k < mtlDocs.mtls.length; k++)
+                if (mtlDocs.mtls[k].name === currentFace.materialName) {
                     currentMtl = mtlDocs.mtls[k];
                     break;
                 }
-            
+
             for (var k = 0; k < currentFace.vIndices.length; k++) {
                 diffuse_colors.push(currentMtl.Kd.r, currentMtl.Kd.g, currentMtl.Kd.b, 1);
                 specular_colors.push(currentMtl.Ks.r, currentMtl.Ks.g, currentMtl.Ks.b, 1);

@@ -1,3 +1,4 @@
+var OFFSCREEN_WIDTH = 2048, OFFSCREEN_HEIGHT = 2048;
 function initProgram() {
     //准备webGL的上下文：获取canvas的引用并保存在canvas变量里，并获取webGLRenderingContest并赋值给gl
     //gl会用来引用webGL上下文
@@ -19,6 +20,29 @@ function initProgram() {
     document.onkeydown = handleKeyDown;
     document.onkeyup = handleKeyUp;
 
+    const shadow_vsSource = `
+    attribute vec4 aVertexPosition;
+
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+    uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+
+    void main() {
+      gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;
+    }
+  `;
+    const shadow_fsSource = `
+    precision mediump float;
+
+    void main() {
+        const vec4 bitShift = vec4(1.0, 256.0, 256.0 * 256.0, 256.0 * 256.0 * 256.0);
+        const vec4 bitMask = vec4(1.0/256.0, 1.0/256.0, 1.0/256.0, 0.0);
+        vec4 rgbaDepth = fract(gl_FragCoord.z * bitShift);
+        rgbaDepth -= rgbaDepth.gbaa * bitMask;
+        gl_FragColor = rgbaDepth;
+        // gl_FragColor = vec4(gl_FragCoord.z, 0.0, 0.0, 0.0);
+    }
+  `;
     const sky_vsSource = `
     attribute vec4 aTextureCoord;   //纹理坐标
 
@@ -608,6 +632,49 @@ function initProgram() {
         }
     }
     `;
+    const plane_vsSource = `
+    attribute vec4 a_Position;
+    attribute vec4 a_Color;
+
+    uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+    uniform mat4 uProjectionMatrixFromLight;//光源角度的投影矩阵
+    uniform mat4 uViewMatrixFromLight;//光源角度的视角矩阵
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+
+    varying vec4 v_PositionFromLight;
+    varying vec4 v_Color;
+    void main() {
+        gl_Position =  uProjectionMatrix * uViewMatrix * uModelMatrix * a_Position; 
+        v_PositionFromLight =uProjectionMatrixFromLight * uViewMatrixFromLight * uModelMatrix * a_Position;
+        v_Color = a_Color;
+    }
+    `;
+
+    const plane_fsSource = `
+    precision mediump float;
+
+    uniform sampler2D uShadowMap;
+
+    varying vec4 v_PositionFromLight;
+    varying vec4 v_Color;
+
+    float unpackDepth(const in vec4 rgbaDepth) {
+        const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0 * 256.0), 1.0/(256.0 * 256.0 * 256.0));
+        float depth = dot(rgbaDepth, bitShift);
+        return depth;
+    }
+
+    void main() {
+        vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
+        vec4 rgbaDepth = texture2D(uShadowMap, shadowCoord.xy);
+        float depth = unpackDepth(rgbaDepth);
+        // float depth = rgbaDepth.r;
+        float visibility =(shadowCoord.z > depth + 0.0015)? 0.7:1.0;
+        gl_FragColor = vec4(v_Color.rgb * visibility, v_Color.a);
+        
+    }
+    `;
     //初始化着色器程序
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
     const fog_shaderProgram = initShaderProgram(gl, fog_vsSource, fog_fsSource);
@@ -616,6 +683,8 @@ function initProgram() {
     const Texture_shaderProgram = initShaderProgram(gl, Texture_vsSource, Texture_fsSource);
     const fog_Texture_shaderProgram = initShaderProgram(gl, fog_Texture_vsSource, fog_Texture_fsSource);
     const particle_shaderProgram = initShaderProgram(gl, particle_vsSource, particle_fsSource);
+    const shadow_shaderProgram = initShaderProgram(gl, shadow_vsSource, shadow_fsSource);
+    const plane_shaderProgram = initShaderProgram(gl, plane_vsSource, plane_fsSource);
 
     //收集着色器程序会用到的所有信息
     const programInfo = {
@@ -743,6 +812,32 @@ function initProgram() {
             time:gl.getUniformLocation(particle_shaderProgram, 'utime'),
         },
     };
+    const shadow_programInfo = {
+        program: shadow_shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(shadow_shaderProgram, 'aVertexPosition'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(shadow_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(shadow_shaderProgram, 'uViewMatrix'),
+            modelMatrix: gl.getUniformLocation(shadow_shaderProgram, 'uModelMatrix'),
+        },
+    };
+    const plane_programInfo = {
+        program: plane_shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(plane_shaderProgram, 'a_Position'),
+            vertexColor: gl.getAttribLocation(plane_shaderProgram, 'a_Color'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(plane_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(plane_shaderProgram, 'uViewMatrix'),
+            projectionMatrixFromLight: gl.getUniformLocation(plane_shaderProgram, 'uProjectionMatrixFromLight'),
+            viewMatrixFromLight: gl.getUniformLocation(plane_shaderProgram, 'uViewMatrixFromLight'),
+            modelMatrix: gl.getUniformLocation(plane_shaderProgram, 'uModelMatrix'),
+            uShadowMap: gl.getUniformLocation(plane_shaderProgram, 'uShadowMap'),
+        },
+    };
     gl.clearColor(0.5, 0.5, 0.5, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -760,6 +855,8 @@ function initProgram() {
         Texture_programInfo: Texture_programInfo,
         fog_Texture_programInfo: fog_Texture_programInfo,
         particle_programInfo: particle_programInfo,
+        shadow_programInfo: shadow_programInfo,
+        plane_programInfo: plane_programInfo,
     }
 }
 
@@ -988,7 +1085,29 @@ function initParticleBuffers(gl, start, end, lifetime, indices) {
         indices: indices,
     }
 }
+function initPlaneBuffers(gl, positions, colors, indices) {
+    //顶点缓冲区
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
+    //为颜色创建缓冲区
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+    //索引缓冲区
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+    return {
+        position: positionBuffer,
+        color: colorBuffer,
+        index: indexBuffer,
+        indices: indices,
+    }
+}
 function loadShader(gl, type, source) {
     const shader = gl.createShader(type);
 
@@ -1174,7 +1293,7 @@ function initTextureBall(Program, center, radius, color) {
     var colors = new Array();
     for (i = 0; i <= 180; i += 1) {
         for (j = 0; j <= 360; j += 1) {
-            colors.push(1, 1, 1, 1);
+            colors.push(1.0, 1.0, 1.0, 1.0);
         }
     }
     var indices = new Array();
@@ -1213,7 +1332,7 @@ function initBoomParticle(Program, center, startscale, endscale) {
     var lifetime = new Array();
     var indices = new Array();
     for (i = 0; i <= 1000; i += 1) {
-        lifetime.push(Math.random());
+        lifetime.push(Math.random()*0.3);
         start.push((Math.random() * 2 - 1) * startscale + center[0]);
         start.push((Math.random() * 2 - 1) * startscale + center[1]);
         start.push((Math.random() * 2 - 1) * startscale + center[2]);
@@ -1224,4 +1343,88 @@ function initBoomParticle(Program, center, startscale, endscale) {
     }
     const buffers = initParticleBuffers(Program.gl, start, end, lifetime, indices);
     return buffers;
+}
+function initPlane(Program, center, size, color) {
+    const positions = [];
+    const colors = [];
+    const indices = [
+        0, 1, 2,
+        3, 4, 5
+    ];
+    {
+        positions.push(center[0] + size[0] / 2);  positions.push(-1.0);positions.push(center[2] + size[1] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] - size[0] / 2);  positions.push(-1.0);positions.push(center[2] + size[1] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] + size[0] / 2);  positions.push(-1.0);positions.push(center[2] - size[1] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] - size[0] / 2);  positions.push(-1.0);positions.push(center[2] - size[1] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] - size[0] / 2);  positions.push(-1.0);positions.push(center[2] + size[1] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+        positions.push(center[0] + size[0] / 2);  positions.push(-1.0);positions.push(center[2] - size[1] / 2);
+        colors.push(color[0], color[1], color[2], color[3]);
+    }
+    const buffers = initPlaneBuffers(Program.gl, positions, colors, indices);
+    return buffers;
+}
+
+function initFramebufferObject(gl) {
+    var framebuffer, texture, depthBuffer;
+
+    // Define the error handling function
+    var error = function () {
+        if (framebuffer) gl.deleteFramebuffer(framebuffer);
+        if (texture) gl.deleteTexture(texture);
+        if (depthBuffer) gl.deleteRenderbuffer(depthBuffer);
+        return null;
+    }
+
+    // Create a framebuffer object (FBO)
+    framebuffer = gl.createFramebuffer();
+    if (!framebuffer) {
+        console.log('Failed to create frame buffer object');
+        return error();
+    }
+
+    // Create a texture object and set its size and parameters
+    texture = gl.createTexture(); // Create a texture object
+    if (!texture) {
+        console.log('Failed to create texture object');
+        return error();
+    }
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // Create a renderbuffer object and Set its size and parameters
+    depthBuffer = gl.createRenderbuffer(); // Create a renderbuffer object
+    if (!depthBuffer) {
+        console.log('Failed to create renderbuffer object');
+        return error();
+    }
+    gl.bindRenderbuffer(gl.RENDERBUFFER, depthBuffer);
+    gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT);
+
+    // Attach the texture and the renderbuffer object to the FBO
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, depthBuffer);
+
+    // Check if FBO is configured correctly
+    var e = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    if (gl.FRAMEBUFFER_COMPLETE !== e) {
+        console.log('Frame buffer object is incomplete: ' + e.toString());
+        return error();
+    }
+
+    framebuffer.texture = texture; // keep the required object
+
+    // Unbind the buffer object
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+
+    return framebuffer;
 }
