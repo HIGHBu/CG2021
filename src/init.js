@@ -312,8 +312,61 @@ function initProgram() {
       gl_FragColor = mix(color,grey,0.5);
     }
   `;
-    //定义纹理顶点着色器
-    const Texture_vsSource = `
+      //定义纹理顶点着色器
+      const Texture_vsSource = `
+      attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
+      attribute vec4 aNormal; //法向量
+      attribute vec2 aTextCoord; //纹理
+  
+      uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+      uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+      uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+      uniform mat4 uReverseModelMatrix; //模型矩阵的逆转置
+  
+      varying vec3 v_Normal;
+      varying vec4 v_Position;
+      varying vec2 v_TextCoord;
+  
+      void main() {
+          gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;  //点坐标位置
+          //法向量进行归一化
+          v_Normal = normalize(vec3(uReverseModelMatrix * aNormal));
+          //变化后的坐标 -> 世界坐标
+          v_Position = uModelMatrix * aVertexPosition;
+          v_TextCoord = aTextCoord;
+      }
+    `;
+      //定义纹理片段着色器
+      const Texture_fsSource = `
+      precision mediump float;
+      uniform sampler2D uSampler;
+      uniform vec3 uLightColor; //光颜色强度
+      uniform vec3 uLightDirection; //光线方向
+  
+      uniform vec3 uAmbientLight; // 环境光
+      
+      varying vec3 v_Normal;
+      varying vec4 v_Position;
+      varying vec2 v_TextCoord;
+      
+      void main() {
+          //纹理作为颜色传入
+          vec4 v_Color=texture2D(uSampler,v_TextCoord);
+          //视线方向并归一化
+  
+          vec3 lightDirection = normalize(uLightDirection);
+          //计算cos入射角 当角度大于90 说明光照在背面 赋值为0
+          float nDotLight = max(dot(lightDirection, v_Normal), 0.0);
+          //计算漫反射光颜色
+          vec3 diffuse = uLightColor * v_Color.rgb * nDotLight;
+          // 环境反射光颜色
+          vec3 ambient = uAmbientLight * v_Color.rgb;
+          gl_FragColor = vec4(diffuse + ambient, v_Color.a);
+      }
+    `;
+
+        //定义纹理顶点着色器
+    const MTLTexture_vsSource = `
     attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
     attribute vec4 aNormal; //法向量
     attribute vec2 aTextCoord; //纹理
@@ -345,8 +398,9 @@ function initProgram() {
         vspecular_Color = aspecular_Color;
     }
   `;
+
     //定义纹理片段着色器
-    const Texture_fsSource = `
+    const MTLTexture_fsSource = `
     precision mediump float;
     uniform sampler2D uSampler;
     uniform vec3 uLightColor; //光颜色强度
@@ -685,7 +739,7 @@ function initProgram() {
     const particle_shaderProgram = initShaderProgram(gl, particle_vsSource, particle_fsSource);
     const shadow_shaderProgram = initShaderProgram(gl, shadow_vsSource, shadow_fsSource);
     const plane_shaderProgram = initShaderProgram(gl, plane_vsSource, plane_fsSource);
-
+    const MTLTexture_shaderProgram = initShaderProgram(gl, MTLTexture_vsSource, MTLTexture_fsSource);
     //收集着色器程序会用到的所有信息
     const programInfo = {
         program: shaderProgram,
@@ -756,9 +810,6 @@ function initProgram() {
         program: Texture_shaderProgram,
         attribLocations: {
             vertexPosition: gl.getAttribLocation(Texture_shaderProgram, 'aVertexPosition'),
-            ambientLight: gl.getAttribLocation(Texture_shaderProgram, 'aAmbientLight'),
-            diffuse_color: gl.getAttribLocation(Texture_shaderProgram, 'adiffuse_Color'),
-            specular_color: gl.getAttribLocation(Texture_shaderProgram, 'aspecular_Color'),
             normal: gl.getAttribLocation(Texture_shaderProgram, 'aNormal'),
             TextCoord: gl.getAttribLocation(Texture_shaderProgram, 'aTextCoord'),
         },
@@ -770,9 +821,30 @@ function initProgram() {
             Sampler: gl.getUniformLocation(Texture_shaderProgram, 'uSampler'),
             lightColor: gl.getUniformLocation(Texture_shaderProgram, 'uLightColor'),
             lightDirection: gl.getUniformLocation(Texture_shaderProgram, 'uLightDirection'),
-            eyePosition: gl.getUniformLocation(Texture_shaderProgram, 'uEyePosition'),
-            roughness: gl.getUniformLocation(Texture_shaderProgram, 'uRoughness'),
-            fresnel: gl.getUniformLocation(Texture_shaderProgram, 'uFresnel'),
+            ambient: gl.getUniformLocation(Texture_shaderProgram, 'uAmbientLight'),
+        },
+    };
+    const MTLTexture_programInfo = {
+        program: MTLTexture_shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(MTLTexture_shaderProgram, 'aVertexPosition'),
+            ambientLight: gl.getAttribLocation(MTLTexture_shaderProgram, 'aAmbientLight'),
+            diffuse_color: gl.getAttribLocation(MTLTexture_shaderProgram, 'adiffuse_Color'),
+            specular_color: gl.getAttribLocation(MTLTexture_shaderProgram, 'aspecular_Color'),
+            normal: gl.getAttribLocation(MTLTexture_shaderProgram, 'aNormal'),
+            TextCoord: gl.getAttribLocation(MTLTexture_shaderProgram, 'aTextCoord'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(MTLTexture_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(MTLTexture_shaderProgram, 'uViewMatrix'),
+            modelMatrix: gl.getUniformLocation(MTLTexture_shaderProgram, 'uModelMatrix'),
+            reverseModelMatrix: gl.getUniformLocation(MTLTexture_shaderProgram, 'uReverseModelMatrix'),
+            Sampler: gl.getUniformLocation(MTLTexture_shaderProgram, 'uSampler'),
+            lightColor: gl.getUniformLocation(MTLTexture_shaderProgram, 'uLightColor'),
+            lightDirection: gl.getUniformLocation(MTLTexture_shaderProgram, 'uLightDirection'),
+            eyePosition: gl.getUniformLocation(MTLTexture_shaderProgram, 'uEyePosition'),
+            roughness: gl.getUniformLocation(MTLTexture_shaderProgram, 'uRoughness'),
+            fresnel: gl.getUniformLocation(MTLTexture_shaderProgram, 'uFresnel'),
           
             // ambient: gl.getUniformLocation(Texture_shaderProgram, 'uAmbientLight'),
         },
@@ -857,6 +929,7 @@ function initProgram() {
         particle_programInfo: particle_programInfo,
         shadow_programInfo: shadow_programInfo,
         plane_programInfo: plane_programInfo,
+        MTLTexture_programInfo: MTLTexture_programInfo,
     }
 }
 
@@ -1009,7 +1082,43 @@ function initBuffers(gl, positions, colors, indices, normals) {
     }
 }
 
-function initTextBuffers(gl, positions, diffuse_colors, specular_colors, indices, normals, TextCoord, ambientLights) {
+function initTextBuffers(gl, positions, colors, indices, normals, TextCoord) {
+    //顶点缓冲区
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+    //为颜色创建缓冲区
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+    //索引缓冲区
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+    //法向量缓冲区
+    const normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+
+    //纹理缓冲区
+    const TextureBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, TextureBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TextCoord), gl.STATIC_DRAW);
+
+    return {
+        position: positionBuffer,
+        color: colorBuffer,
+        index: indexBuffer,
+        normal: normalBuffer,
+        TextCoord: TextureBuffer,
+        indices: indices,
+    }
+}
+
+function initMTLTextBuffers(gl, positions, diffuse_colors, specular_colors, indices, normals, TextCoord, ambientLights) {
     //顶点缓冲区
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
