@@ -16,7 +16,7 @@ function initProgram() {
     hud.onmouseup = handleMouseUp;
     hud.onmousemove = handleMouseMove;
     hud.onmouseout = handleMouseOut;
-    hud.addEventListener('wheel',onMouseWheel,false);
+    hud.addEventListener('wheel', onMouseWheel, false);
     document.onkeydown = handleKeyDown;
     document.onkeyup = handleKeyUp;
 
@@ -312,8 +312,8 @@ function initProgram() {
       gl_FragColor = mix(color,grey,0.5);
     }
   `;
-      //定义纹理顶点着色器
-      const Texture_vsSource = `
+    //定义纹理顶点着色器
+    const Texture_vsSource = `
       attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
       attribute vec4 aNormal; //法向量
       attribute vec2 aTextCoord; //纹理
@@ -336,8 +336,8 @@ function initProgram() {
           v_TextCoord = aTextCoord;
       }
     `;
-      //定义纹理片段着色器
-      const Texture_fsSource = `
+    //定义纹理片段着色器
+    const Texture_fsSource = `
       precision mediump float;
       uniform sampler2D uSampler;
       uniform vec3 uLightColor; //光颜色强度
@@ -365,7 +365,7 @@ function initProgram() {
       }
     `;
 
-        //定义纹理顶点着色器
+    //定义纹理顶点着色器
     const MTLTexture_vsSource = `
     attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
     attribute vec4 aNormal; //法向量
@@ -544,13 +544,11 @@ function initProgram() {
 
     varying lowp vec4 vColor;        //颜色varying类变量，用于向片段着色器传递颜色属性
     varying lowp vec3 vNomral;
-    varying lowp vec4 vPosition;
     
     void main() {
       gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;  //点坐标位置
       vColor = aVertexColor;        //点的颜色
       //变化后的坐标 -> 世界坐标
-      vPosition = uModelMatrix * aVertexPosition;
       vNomral = normalize(vec3(uNormalMatrix * aVertexNormal));
     }
   `;
@@ -564,7 +562,6 @@ function initProgram() {
 
     varying lowp vec4 vColor;
     varying lowp vec3 vNomral;
-    varying lowp vec4 vPosition;
     
     void main() {
       vec3 lightDirection = normalize(uLightDirection);
@@ -647,6 +644,7 @@ function initProgram() {
 
     attribute vec3 astart;
     attribute vec3 aend;
+    attribute vec4 aColor;
     attribute float alifetime;
 
     uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
@@ -656,6 +654,8 @@ function initProgram() {
 
     varying float outlifetime;
     varying float tt;
+    varying vec4 v_Color;
+
     void main() {
         vec4 pos;
         tt=alifetime-utime;
@@ -665,12 +665,14 @@ function initProgram() {
         gl_PointSize = 5.0;
         outlifetime = 1.0-tt;
         outlifetime = clamp(outlifetime,0.0,1.0);
+        v_Color = aColor;
       }
     `;
     const particle_fsSource = `
     precision mediump float;
     varying float outlifetime;
     varying float tt;
+    varying vec4 v_Color;
 
     void main(){
         if(tt<0.0){
@@ -679,7 +681,7 @@ function initProgram() {
         else{
             float d = distance(gl_PointCoord, vec2(0.5, 0.5));
             if(d < 0.5) {// Radius is 0.5
-                gl_FragColor.xyz = vec3(0.0, 0.0, 0.0);
+                gl_FragColor.xyz = v_Color.rgb;
                 gl_FragColor.w = outlifetime;
             }
             else discard;
@@ -704,7 +706,6 @@ function initProgram() {
         v_Color = a_Color;
     }
     `;
-
     const plane_fsSource = `
     precision mediump float;
 
@@ -729,6 +730,30 @@ function initProgram() {
         
     }
     `;
+    const line_vsSource = `
+    attribute vec4 aVertexColor; //颜色属性，用四维向量表示（第四维无意义，用于计算）
+    attribute vec4 aVertexPosition; //位置属性，用四维向量表示（第四维无意义，用于计算）
+
+    uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
+    uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+    uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
+
+    varying lowp vec4 vColor;        //颜色varying类变量，用于向片段着色器传递颜色属性
+
+    void main() {
+        gl_Position = uProjectionMatrix * uViewMatrix * uModelMatrix * aVertexPosition;  //点坐标位置
+        vColor = aVertexColor;        //点的颜色
+      }
+    `;
+    const line_fsSource = `
+    precision mediump float;
+    varying lowp vec4 vColor;
+
+    void main() {
+        gl_FragColor = vColor;
+    }
+
+    `;
     //初始化着色器程序
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
     const fog_shaderProgram = initShaderProgram(gl, fog_vsSource, fog_fsSource);
@@ -740,6 +765,9 @@ function initProgram() {
     const shadow_shaderProgram = initShaderProgram(gl, shadow_vsSource, shadow_fsSource);
     const plane_shaderProgram = initShaderProgram(gl, plane_vsSource, plane_fsSource);
     const MTLTexture_shaderProgram = initShaderProgram(gl, MTLTexture_vsSource, MTLTexture_fsSource);
+    const line_shaderProgram = initShaderProgram(gl, line_vsSource, line_fsSource);
+
+
     //收集着色器程序会用到的所有信息
     const programInfo = {
         program: shaderProgram,
@@ -845,7 +873,7 @@ function initProgram() {
             eyePosition: gl.getUniformLocation(MTLTexture_shaderProgram, 'uEyePosition'),
             roughness: gl.getUniformLocation(MTLTexture_shaderProgram, 'uRoughness'),
             fresnel: gl.getUniformLocation(MTLTexture_shaderProgram, 'uFresnel'),
-          
+
             // ambient: gl.getUniformLocation(Texture_shaderProgram, 'uAmbientLight'),
         },
     };
@@ -876,12 +904,13 @@ function initProgram() {
             start: gl.getAttribLocation(particle_shaderProgram, 'astart'),
             end: gl.getAttribLocation(particle_shaderProgram, 'aend'),
             lifetime: gl.getAttribLocation(particle_shaderProgram, 'alifetime'),
+            color: gl.getAttribLocation(particle_shaderProgram, 'aColor'),
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(particle_shaderProgram, 'uProjectionMatrix'),
             viewMatrix: gl.getUniformLocation(particle_shaderProgram, 'uViewMatrix'),
             modelMatrix: gl.getUniformLocation(particle_shaderProgram, 'uModelMatrix'),
-            time:gl.getUniformLocation(particle_shaderProgram, 'utime'),
+            time: gl.getUniformLocation(particle_shaderProgram, 'utime'),
         },
     };
     const shadow_programInfo = {
@@ -910,6 +939,18 @@ function initProgram() {
             uShadowMap: gl.getUniformLocation(plane_shaderProgram, 'uShadowMap'),
         },
     };
+    const line_programInfo = {
+        program: line_shaderProgram,
+        attribLocations: {
+            vertexPosition: gl.getAttribLocation(line_shaderProgram, 'aVertexPosition'),
+            vertexColor: gl.getAttribLocation(line_shaderProgram, 'aVertexColor'),
+        },
+        uniformLocations: {
+            projectionMatrix: gl.getUniformLocation(line_shaderProgram, 'uProjectionMatrix'),
+            viewMatrix: gl.getUniformLocation(line_shaderProgram, 'uViewMatrix'),
+            modelMatrix: gl.getUniformLocation(line_shaderProgram, 'uModelMatrix'),
+        },
+    }
     gl.clearColor(0.5, 0.5, 0.5, 1.0);  // Clear to black, fully opaque
     gl.clearDepth(1.0);                 // Clear everything
     gl.enable(gl.DEPTH_TEST);           // Enable depth testing
@@ -930,6 +971,7 @@ function initProgram() {
         shadow_programInfo: shadow_programInfo,
         plane_programInfo: plane_programInfo,
         MTLTexture_programInfo: MTLTexture_programInfo,
+        line_programInfo: line_programInfo,
     }
 }
 
@@ -947,7 +989,6 @@ function initShaderProgram(gl, vsSource, fsSource) {
 
     return shaderProgram;
 }
-
 
 var mouseDown = false;
 var lastMouseX = 0;
@@ -1030,26 +1071,26 @@ function handleKeyDown(event) {
         rotation.rad -= del;
         rotation.aixs[0] = 1;
     }
+    else if (String.fromCharCode(event.keyCode) == "Z") {//Zoom to fit
+        var distance = Math.pow(eye[0] - target[0], 2) + Math.pow(eye[1] - target[1], 2) + Math.pow(eye[2] - target[2], 2);
+        distance = Math.sqrt(distance);
+        eye[0] = eye[0] - (eye[0] - target[0]) / distance * sum_deltaY * 0.001;
+        eye[1] = eye[1] - (eye[1] - target[1]) / distance * sum_deltaY * 0.001;
+        eye[2] = eye[2] - (eye[2] - target[2]) / distance * sum_deltaY * 0.001;
+        sum_deltaY = 0.0;
+    }
 }
 function handleKeyUp(event) {
     rotation.aixs[0] = 0.0;
 }
-function onMouseWheel(event){
-    var distance = Math.pow(eye[0]-target[0], 2)+Math.pow(eye[1]-target[1], 2)+Math.pow(eye[2]-target[2], 2);
+function onMouseWheel(event) {
+    var distance = Math.pow(eye[0] - target[0], 2) + Math.pow(eye[1] - target[1], 2) + Math.pow(eye[2] - target[2], 2);
     distance = Math.sqrt(distance);
-    if(event.deltaY>0){
-        if(distance<30){
-            eye[0] = target[0] + (eye[0]-target[0])*(1.0+event.deltaY*0.001);
-            eye[1] = target[1] + (eye[1]-target[1])*(1.0+event.deltaY*0.001);
-            eye[2] = target[2] + (eye[2]-target[2])*(1.0+event.deltaY*0.001);
-        }
-    }
-    else{
-        if(distance>3){
-            eye[0] = target[0] + (eye[0]-target[0])*(1.0+event.deltaY*0.001);
-            eye[1] = target[1] + (eye[1]-target[1])*(1.0+event.deltaY*0.001);
-            eye[2] = target[2] + (eye[2]-target[2])*(1.0+event.deltaY*0.001);
-        }
+    if ((event.deltaY > 0 && distance < 15) || (event.deltaY < 0 && distance > 3)) {
+        eye[0] = eye[0] + (eye[0] - target[0]) / distance * event.deltaY * 0.001;
+        eye[1] = eye[1] + (eye[1] - target[1]) / distance * event.deltaY * 0.001;
+        eye[2] = eye[2] + (eye[2] - target[2]) / distance * event.deltaY * 0.001;
+        sum_deltaY = sum_deltaY + event.deltaY;
     }
 }
 function initBuffers(gl, positions, colors, indices, normals) {
@@ -1165,7 +1206,7 @@ function initMTLTextBuffers(gl, positions, diffuse_colors, specular_colors, indi
     }
 }
 
-function initParticleBuffers(gl, start, end, lifetime, indices) {
+function initParticleBuffers(gl, start, end, lifetime, color, indices) {
     //开始顶点缓冲区
     const startBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, startBuffer);
@@ -1181,6 +1222,11 @@ function initParticleBuffers(gl, start, end, lifetime, indices) {
     gl.bindBuffer(gl.ARRAY_BUFFER, lifeBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lifetime), gl.STATIC_DRAW);
 
+    //开始顶点缓冲区
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color), gl.STATIC_DRAW);
+
     //索引缓冲区
     const indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
@@ -1190,6 +1236,7 @@ function initParticleBuffers(gl, start, end, lifetime, indices) {
         start: startBuffer,
         end: endBuffer,
         lifetime: lifeBuffer,
+        color: colorBuffer,
         index: indexBuffer,
         indices: indices,
     }
@@ -1435,22 +1482,27 @@ function initTextureBall(Program, center, radius, color) {
     return buffers;
 }
 
-function initBoomParticle(Program, center, startscale, endscale) {
+function initParticle(Program, center, color, num, startscale, endscale, speed) {
     var start = new Array();
     var end = new Array();
     var lifetime = new Array();
     var indices = new Array();
-    for (i = 0; i <= 1000; i += 1) {
-        lifetime.push(Math.random()*0.3);
+    var colors = new Array();
+    for (i = 0; i <= num; i += 1) {
+        lifetime.push(Math.random() * speed);
         start.push((Math.random() * 2 - 1) * startscale + center[0]);
         start.push((Math.random() * 2 - 1) * startscale + center[1]);
         start.push((Math.random() * 2 - 1) * startscale + center[2]);
         end.push((Math.random() * 2 - 1) * endscale + center[0]);
         end.push((Math.random() * 2 - 1) * endscale + center[1]);
         end.push((Math.random() * 2 - 1) * endscale + center[2]);
+        colors.push(color[0]);
+        colors.push(color[1]);
+        colors.push(color[2]);
+        colors.push(color[3]);
         indices.push(i);
     }
-    const buffers = initParticleBuffers(Program.gl, start, end, lifetime, indices);
+    const buffers = initParticleBuffers(Program.gl, start, end, lifetime, colors, indices);
     return buffers;
 }
 function initPlane(Program, center, size, color) {
@@ -1461,17 +1513,17 @@ function initPlane(Program, center, size, color) {
         3, 4, 5
     ];
     {
-        positions.push(center[0] + size[0] / 2);  positions.push(-1.0);positions.push(center[2] + size[1] / 2);
+        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
         colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] - size[0] / 2);  positions.push(-1.0);positions.push(center[2] + size[1] / 2);
+        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
         colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] + size[0] / 2);  positions.push(-1.0);positions.push(center[2] - size[1] / 2);
+        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
         colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] - size[0] / 2);  positions.push(-1.0);positions.push(center[2] - size[1] / 2);
+        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
         colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] - size[0] / 2);  positions.push(-1.0);positions.push(center[2] + size[1] / 2);
+        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
         colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] + size[0] / 2);  positions.push(-1.0);positions.push(center[2] - size[1] / 2);
+        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
         colors.push(color[0], color[1], color[2], color[3]);
     }
     const buffers = initPlaneBuffers(Program.gl, positions, colors, indices);
@@ -1536,4 +1588,27 @@ function initFramebufferObject(gl) {
     gl.bindRenderbuffer(gl.RENDERBUFFER, null);
 
     return framebuffer;
+}
+
+function initOneLine(Program, start, end) {
+    var positions = new Array();
+    var num = 1000;
+    for (i = 0; i < num; i += 1) {
+        positions.push(start[0] + 1.0 * i * (end[0] - start[0]) / num);
+        positions.push(start[1] + 1.0 * i * (end[1] - start[1]) / num);
+        positions.push(start[2] + 1.0 * i * (end[2] - start[2]) / num);
+    }
+    var colors = new Array();
+    for (i = 0; i < num; i += 1) {
+        colors.push(0.6);
+        colors.push(0.6);
+        colors.push(0.6);
+        colors.push(1.0 * i / num);
+    }
+    var indices = new Array();
+    for (i = 0; i < num; i += 1) {
+        indices.push(i);
+    }
+    const buffers = initPlaneBuffers(Program.gl, positions, colors, indices);
+    return buffers;
 }
