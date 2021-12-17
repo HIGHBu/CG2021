@@ -1,4 +1,4 @@
-var weather = 1;//0代表晴天，1代表雾天
+var weather = 0;//0代表晴天，1代表雾天
 var score = 0;//获得分数
 var crash = 0;//坠毁标志
 var boom_time = 1000;//爆炸用计时器
@@ -1256,7 +1256,8 @@ window.onload = function () {
         const skyboxbuffer = initSkybox(Program);
 
         LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objDocArray, mtlDocArray, planeSize, false);
-
+        // LoadObjFile(Program.gl, '../obj/building/file.obj', objDocArray, mtlDocArray, planeSize, false);
+        
         var fbo = initFramebufferObject(Program.gl);
         if (!fbo) {
             console.log('Failed to initialize frame buffer object');

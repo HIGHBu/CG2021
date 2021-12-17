@@ -159,7 +159,7 @@ function initProgram() {
     
         return f;
     }
-    float map(in vec3 p, float oct){
+    float map(in vec3 ro, in vec3 p, float oct){
         //使云朵向前下方移动
         vec3 q = p - vec3(0.0,0.1,1.0) * uTime;
         float g1 = 0.5+0.5*noise_worley( q*0.3 );
@@ -175,9 +175,13 @@ function initProgram() {
         //f2 * a - 0.75, a越大，边缘细节越多
         f2 = mix( f2*0.1-0.75, f2, g2*g2 ) + 0.2;
         
-        //float f = 1. - f1 + f2;
         float f = mix(f1, f2, 0.9);
-        return 1.5*f - 0.5 - p.y;
+        if(ro.y > 0.01)
+            return 1.5*f + 0.1 - clamp(q.y, -ro.y / 4.0, ro.y / 4.0);
+
+        else
+            return 1.5*f + 0.1 + clamp(q.y, ro.y / 4.0, -ro.y / 4.0);
+        
     }
     vec3 sundir = normalize(uLightDirection);
     const int kDiv = 1; // make bigger for higher quality
@@ -193,54 +197,48 @@ function initProgram() {
         // 确认需要ray march的区域
         float tmin, tmax;
 
-            tmin = 0.0;
-            tmax = 50.0;
-            // t_bottom为正表示视线朝下
-            if(t_bottom > 0.0)
-                tmax = min(tmax, t_bottom);
-            // t_top为正表示视线朝上
-            if(t_top > 0.0)
-                tmax = min(tmax, t_top);
+        tmin = abs(ro.y) + 0.1;
+        tmax = tmin + 1.5;
 
-        
         float t = tmin;
         
         // raymarch loop
         vec4 sum = vec4(0.0);
+        int no_cloud = 0;
         for( int i=0; i<50*kDiv; i++ )
         {
            // step size
+           if(no_cloud >= 50)
+            break;
            float dt = max(0.3,0.1*t/float(kDiv));
     
            float oct = 1.;
 
            //cloud
            vec3 pos = ro + t*rd;
-           if(pos. y > y_top)
-                break;
-            else{
-                float den = map(pos,oct);
-                if( den > 0.01 ){ // if inside
-                    // do lighting
-                    float dif = clamp((den - map(pos+0.3 * sundir, oct)) / 0.3, 0.0, 1.0 );
-                    vec3  lin = vec3(0.65, 0.65, 0.75) * 1.1 + 0.8 * vec3(1.0, 0.6, 0.3) * dif;
-                    vec4  col = vec4(mix(vec3(1.0,0.95,0.8), vec3(0.25,0.3,0.35), den), den);
-                    col.xyz *= lin;
-                    // fog
-                    col.xyz = mix(col.xyz, bgcol, 1.0 - exp2(-0.003 * t * t));
-                    // composite front to back
-                    col.w    = min(col.w * 8.0 * dt,1.0);
-                    col.rgb *= col.a;
-                    sum += col*(1.0-sum.a);
-                }
-     
-            }
+           float den = map(ro, pos,oct);
+           if( den > 0.01 ){ // if inside
+               // do lighting
+               float dif = clamp((den - map(ro, pos+0.3 * sundir, oct)) / 0.3, 0.0, 1.0 );
+               vec3  lin = vec3(0.65, 0.65, 0.75) * 1.1 + 0.8 * vec3(1.0, 0.6, 0.3) * dif;
+               vec4  col = vec4(mix(vec3(1.0,0.95,0.8), vec3(0.25,0.3,0.35), den), den);
+               col.xyz *= lin;
+               // fog
+               col.xyz = mix(col.xyz, bgcol, 1.0 - exp2(-0.003 * t * t));
+               // composite front to back
+               col.w    = min(col.w * 8.0 * dt,1.0);
+               col.rgb *= col.a;
+               sum += col*(1.0-sum.a);
+           }
+           else{
+               no_cloud += 1;
+           }
            // advance ray
            t += dt;
            // until far clip or full opacity
            if( t>tmax || sum.a>0.99 ) break;
         }
-    
+        no_cloud = 0;
         return clamp(sum, 0.0, 1.0);
     }
     
@@ -268,18 +266,8 @@ function initProgram() {
 
     void main() {
 
-      vec3 cu = normalize(uTargetPosition - uEyePosition);
-      vec3 cv = normalize(uUp);
-      vec3 cw = normalize(cross(cu, cv));
-      mat3 ca = mat3(cu, cv, cw);
-      // ray
-      vec3 rd = ca * normalize(vTextureCoord);
-    //   if(vTextureCoord.y > -3.0)
-    //     gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
-    //   else
-      gl_FragColor = render(uEyePosition, normalize(vTextureCoord));
-
-      // gl_FragColor = textureCube(uSampler, normalize(vTextureCoord));
+        vec3 vec = vec3(0., clamp(-1.0 + uTime, -1.0, 1.0), 0.);
+        gl_FragColor = render(vec, normalize(vTextureCoord));
     }
   `;
     //定义雾天天空盒顶点着色器
