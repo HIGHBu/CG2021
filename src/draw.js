@@ -437,7 +437,8 @@ function drawLine(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
         const type = Program.gl.UNSIGNED_SHORT;
         const vertexCount = buffers.indices.length;
         //按连续的三角形方式以此按点绘制
-        Program.gl.drawElements(Program.gl.LINE_STRIP, vertexCount, type, offset);
+        // Program.gl.drawElements(Program.gl.LINE_STRIP, vertexCount, type, offset);
+        Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
     }
 }
 window.onload = function () {
@@ -1076,53 +1077,6 @@ window.onload = function () {
             Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
         }
     }
-    function drawLineShadow(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
-
-        //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
-        {
-            const numComponents = 3;//每次取出3个数值
-            const type = Program.gl.FLOAT;//取出数据为浮点数类型
-            const normalize = false;
-            const stride = 0;
-            const offset = 0;
-            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.position);
-            Program.gl.vertexAttribPointer(
-                Program.shadow_programInfo.attribLocations.vertexPosition,
-                numComponents,
-                type,
-                normalize,
-                stride,
-                offset);
-            Program.gl.enableVertexAttribArray(
-                Program.shadow_programInfo.attribLocations.vertexPosition);
-        }
-        // Tell WebGL which indices to use to index the vertices
-        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
-
-        //webGL使用此程序进行绘制
-        Program.gl.useProgram(Program.shadow_programInfo.program);
-
-        // 设置着色器的uniform型变量
-        Program.gl.uniformMatrix4fv(
-            Program.shadow_programInfo.uniformLocations.projectionMatrix,
-            false,
-            projectionMatrix);
-        Program.gl.uniformMatrix4fv(
-            Program.shadow_programInfo.uniformLocations.viewMatrix,
-            false,
-            viewMatrix);
-        Program.gl.uniformMatrix4fv(
-            Program.shadow_programInfo.uniformLocations.modelMatrix,
-            false,
-            modelMatrix);
-        {
-            const offset = 0;
-            const type = Program.gl.UNSIGNED_SHORT;
-            const vertexCount = buffers.indices.length;
-            //按连续的三角形方式以此按点绘制
-            Program.gl.drawElements(Program.gl.LINE_STRIP, vertexCount, type, offset);
-        }
-    }
     //设置模型矩阵，translation为模型的平移，rotation为模型的旋转。modelrotation，modelrotation用于模型的方向修正
     function setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation,) {
         const modelMatrix = mat4.create();
@@ -1254,11 +1208,16 @@ window.onload = function () {
         var center3 = [0.0, 2.0, 0.0];
         var center4 = [6.0, 4.0, 0.0];
         var center5 = [0.0, -2.0, 0.0];
+        var center_cone = [0.0, 2.0, 3.0];
+        var center_cylinder = [-4.0, 2.0, 3.0];
         var radius1 = 0.8;
         var radius2 = 0.6;
         var radius3 = 0.6;
         var radius4 = 0.4;
-
+        var radius_cone = 1.0;
+        var height_cone = 1.0;
+        var radius_cylinder = 1.0;
+        var height_cylinder = 1.0;
         // crashObjSet
         crashObjSet.push(new crashObj(center1, radius1, radius1, radius1));
         crashObjSet.push(new crashObj(center2, radius2, radius2, radius2));
@@ -1271,10 +1230,11 @@ window.onload = function () {
         var color4 = [239 / 255.0, 169 / 255.0, 13 / 255.0, 1.0];   //Yellow
         var black = [0.0, 0.0, 0.0, 1.0];
         var gold = [205 / 255.0, 127 / 255.0, 50 / 255.0, 1.0];
-        var start1 = [-1.6, 0.0, 0.0];
-        var start2 = [1.6, 0.0, 0.0];
+        var start1 = [-1.55, -0.05, 0.1];
+        var start2 = [1.55, -0.05, 0.1];
         var end1 = [-2.0, 0.0, 5.0];
         var end2 = [2.0, 0.0, 5.0];
+        var size_line = [0.03, 0.01];
         var text_filepath1 = '../res/sun.jpg';
         var text_filepath2 = '../res/mercury.jpg';
         var text_filepath3 = '../res/earth.jpg';
@@ -1285,8 +1245,8 @@ window.onload = function () {
         const ballbuffer2 = initTextureBall(Program, center2, radius2, color2);
         const ballbuffer3 = initTextureBall(Program, center3, radius3, color3);
         const ballbuffer4 = initTextureBall(Program, center4, radius4, color4);
-        const linebuffer1 = initOneLine(Program, start1, end1);
-        const linebuffer2 = initOneLine(Program, start2, end2);
+        const conebuffer = initOneCone(Program, center_cylinder, radius_cylinder, height_cylinder, gold);
+        const cylinderbuffer = initOneCylinder(Program, center_cone, radius_cone, height_cone, gold);
         const boomparticlebuffer = initParticle(Program, center, black, 1000, 1.2, 0.5, 0.3);
         const prizeparticlebuffer1 = initParticle(Program, center1, gold, 400, 0.7, 0.5, 0.05);
         const prizeparticlebuffer2 = initParticle(Program, center2, gold, 400, 0.7, 0.5, 0.05);
@@ -1317,6 +1277,8 @@ window.onload = function () {
         var then = 0;
         // Draw the scene repeatedly
         function render(now) {
+            const linebuffer1 = initLineCube(Program, start1, end1, size_line);
+            const linebuffer2 = initLineCube(Program, start2, end2, size_line);
             checkCollision();
             now *= 0.001;  // convert to seconds
             const deltaTime = now - then;
@@ -1338,7 +1300,8 @@ window.onload = function () {
 
             const line_modelMatrix1 = setModelMatrix(translation, rotation);
             const line_modelMatrix2 = setModelMatrix(translation, rotation);
-
+            const cone_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation);
+            const cylinder_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation);
 
             requestAnimationFrame(render);
             draw2D(Program.ctx);
@@ -1351,12 +1314,14 @@ window.onload = function () {
                         Program.gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // Set view port for FBO
                         Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);   // Clear FBO    
                         drawShadow(Program, objbuffers[0], aircraft_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
-                        // drawLineShadow(Program, linebuffer1, line_modelMatrix1, viewMatrixFromLight, projectionMatrixFromLight);
-                        // drawLineShadow(Program, linebuffer2, line_modelMatrix2, viewMatrixFromLight, projectionMatrixFromLight);
+                        drawShadow(Program, linebuffer1, line_modelMatrix1, viewMatrixFromLight, projectionMatrixFromLight);
+                        drawShadow(Program, linebuffer2, line_modelMatrix2, viewMatrixFromLight, projectionMatrixFromLight);
                         drawShadow(Program, ballbuffer1, ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                         drawShadow(Program, ballbuffer2, ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                         drawShadow(Program, ballbuffer3, ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                         drawShadow(Program, ballbuffer4, ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                        drawShadow(Program, conebuffer, cone_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                        drawShadow(Program, cylinderbuffer, cylinder_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                         Program.gl.bindFramebuffer(Program.gl.FRAMEBUFFER, null);               // Change the drawing destination to color buffer
                         Program.gl.viewport(0, 0, cw, ch);
                         Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);    // Clear color and depth buffer
@@ -1386,6 +1351,8 @@ window.onload = function () {
                 drawfogTexture(Program, ballbuffer2, ball_modelMatrix, viewMatrix, projectionMatrix, 1, lightDirection);
                 drawfogTexture(Program, ballbuffer3, ball_modelMatrix, viewMatrix, projectionMatrix, 2, lightDirection);
                 drawfogTexture(Program, ballbuffer4, ball_modelMatrix, viewMatrix, projectionMatrix, 3, lightDirection);
+                draw(Program,conebuffer,cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
+                draw(Program,cylinderbuffer,cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
             }
             nochange_translation[2] += deltaTime * speed;//让飞机每秒都按速度向前
             // translation[2] -= deltaTime * speed;

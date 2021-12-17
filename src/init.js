@@ -1590,25 +1590,117 @@ function initFramebufferObject(gl) {
     return framebuffer;
 }
 
-function initOneLine(Program, start, end) {
+function initLineCube(Program, start, end, size) {
     var positions = new Array();
-    var num = 1000;
-    for (i = 0; i < num; i += 1) {
-        positions.push(start[0] + 1.0 * i * (end[0] - start[0]) / num);
-        positions.push(start[1] + 1.0 * i * (end[1] - start[1]) / num);
-        positions.push(start[2] + 1.0 * i * (end[2] - start[2]) / num);
-    }
+    positions.push(start[0] + size[0], start[1] + size[1], start[2]);
+    positions.push(start[0] + size[0], start[1] - size[1], start[2]);
+    positions.push(start[0] - size[0], start[1] + size[1], start[2]);
+    positions.push(start[0] - size[0], start[1] - size[1], start[2]);
+    positions.push(end[0] + size[0], end[1] + size[1], end[2]);
+    positions.push(end[0] + size[0], end[1] - size[1], end[2]);
+    positions.push(end[0] - size[0], end[1] + size[1], end[2]);
+    positions.push(end[0] - size[0], end[1] - size[1], end[2]);
     var colors = new Array();
-    for (i = 0; i < num; i += 1) {
-        colors.push(0.6);
-        colors.push(0.6);
-        colors.push(0.6);
-        colors.push(1.0 * i / num);
-    }
-    var indices = new Array();
-    for (i = 0; i < num; i += 1) {
-        indices.push(i);
-    }
+    for (var i = 0; i < 4; i++)
+        colors.push(0.6, 0.6, 0.6, 0.2 * speed);
+    for (var i = 0; i < 4; i++)
+        colors.push(0.6, 0.6, 0.6, 1.0);
+    var indices = [
+        0, 1, 2,
+        1, 2, 3,
+        2, 3, 6,
+        3, 6, 7,
+        2, 6, 0,
+        0, 6, 4,
+        0, 4, 1,
+        1, 4, 5,
+        1, 5, 7,
+        1, 3, 7,
+        4, 5, 6,
+        5, 6, 7
+    ];
     const buffers = initPlaneBuffers(Program.gl, positions, colors, indices);
+    return buffers;
+}
+function initOneCone(Program, center, radius, height, color) {
+    const positions = [];
+    const colors = [];
+    const indices = [];
+    const normals = [];
+    for (i = 0; i < 360; i += 1) {
+        positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
+        positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
+        positions.push(center[2]);
+    }
+    positions.push(center[0], center[1], center[2]);//圆心
+    positions.push(center[0], center[1], center[2] + height);//顶点
+
+    for (i = 0; i < 361; i = i + 1) {
+        colors.push(color[0], color[1], color[2], color[3]);
+    }
+    colors.push(0.0, 0.0, 0.0, 1.0);//顶点弄成黑的
+    for (i = 0; i < 359; i += 1) {
+        indices.push(i, i + 1, 360);
+        normals.push(0.0, 0.0, -1.0);
+        indices.push(i, i + 1, 361);
+        var vec1 = [radius * Math.cos(2 * Math.PI * i / 360.0), radius * Math.sin(2 * Math.PI * i / 360.0), -height];
+        var vec2 = [radius * Math.cos(2 * Math.PI * (i + 1) / 360.0), radius * Math.sin(2 * Math.PI * (i + 1) / 360.0), -height];
+        var vec3 = [vec1[1] * vec2[2] - vec1[2] * vec2[1], vec1[2] * vec2[0] - vec1[0] * vec2[2], vec1[0] * vec2[1] - vec1[1] * vec2[0]];
+        normals.push(vec3[0], vec3[1], vec3[2]);
+    }
+    indices.push(360, 359, 0);
+    normals.push(0.0, 0.0, -1.0);
+    indices.push(361, 359, 0);
+    var vec1 = [radius * Math.cos(2 * Math.PI * 359 / 360.0), radius * Math.sin(2 * Math.PI * 359 / 360.0), -height];
+    var vec2 = [radius * Math.cos(2 * Math.PI * 0 / 360.0), radius * Math.sin(2 * Math.PI * 0 / 360.0), -height];
+    var vec3 = [vec1[1] * vec2[2] - vec1[2] * vec2[1], vec1[2] * vec2[0] - vec1[0] * vec2[2], vec1[0] * vec2[1] - vec1[1] * vec2[0]];
+    normals.push(vec3[0], vec3[1], vec3[2]);
+    const buffers = initBuffers(Program.gl, positions, colors, indices, normals);
+    return buffers;
+}
+function initOneCylinder(Program, center, radius, height, color) {
+    const positions = [];
+    const colors = [];
+    const indices = [];
+    const normals = [];
+    for (i = 0; i < 360; i += 1) {
+        positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
+        positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
+        positions.push(center[2]);
+    }
+    for (i = 0; i < 360; i += 1) {
+        positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
+        positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
+        positions.push(center[2] + height);
+    }
+    positions.push(center[0], center[1], center[2]);//上圆心 720
+    positions.push(center[0], center[1], center[2] + height);//下圆心  721
+
+    for (i = 0; i < 722; i = i + 1) {
+        colors.push(color[0], color[1], color[2], color[3]);
+    }
+    for (i = 0; i < 359; i += 1) {
+        indices.push(i, i + 1, 720);
+        normals.push(0.0, 0.0, -1.0);
+        indices.push(i + 360, i + 361, 721);
+        normals.push(0.0, 0.0, 1.0);
+    }
+    indices.push(720, 359, 0);
+    normals.push(0.0, 0.0, -1.0);
+    indices.push(721, 719, 360);
+    normals.push(0.0, 0.0, 1.0);
+    for (i = 0; i < 359; i += 1) {
+        indices.push(i, i + 360, i + 1);
+        indices.push(i + 1, i + 360, i + 361);
+        // normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
+        // normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
+    }
+    indices.push(359,0,719);
+    indices.push(0,719,360);
+    for (i = 0; i < 360; i += 1) {
+        normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
+        normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
+    }
+    const buffers = initBuffers(Program.gl, positions, colors, indices, normals);
     return buffers;
 }
