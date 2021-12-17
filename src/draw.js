@@ -756,6 +756,146 @@ window.onload = function () {
             Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
         }
     }
+    function drawMTLColor(Program, buffers, modelMatrix, viewMatrix, projectionMatrix, lightDirection) {
+        //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.position);
+            Program.gl.vertexAttribPointer(
+                Program.MTLColor_programInfo.attribLocations.vertexPosition,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.MTLColor_programInfo.attribLocations.vertexPosition);
+        }
+        //为webGL设置从缓冲区抽取法向量数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.normal);
+            Program.gl.vertexAttribPointer(
+                Program.MTLColor_programInfo.attribLocations.normal,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.MTLColor_programInfo.attribLocations.normal);
+        }
+        {
+            const numComponents = 4;//每次取出4个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.ambientLight);
+            Program.gl.vertexAttribPointer(
+                Program.MTLColor_programInfo.attribLocations.ambientLight,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.MTLColor_programInfo.attribLocations.ambientLight);
+        }
+        {
+            const numComponents = 4;//每次取出4个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.diffuse_color);
+            Program.gl.vertexAttribPointer(
+                Program.MTLColor_programInfo.attribLocations.diffuse_color,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.MTLColor_programInfo.attribLocations.diffuse_color);
+        }
+        {
+            const numComponents = 4;//每次取出4个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.specular_color);
+            Program.gl.vertexAttribPointer(
+                Program.MTLColor_programInfo.attribLocations.specular_color,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.MTLColor_programInfo.attribLocations.specular_color);
+        }
+        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffers.index);
+
+        //webGL使用此程序进行绘制
+        Program.gl.useProgram(Program.MTLColor_programInfo.program);
+
+        // 设置着色器的uniform型变量
+        Program.gl.uniformMatrix4fv(
+            Program.MTLColor_programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.MTLColor_programInfo.uniformLocations.viewMatrix,
+            false,
+            viewMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.MTLColor_programInfo.uniformLocations.modelMatrix,
+            false,
+            modelMatrix);
+        const reverseModelMat = mat4.create();
+        mat4.invert(reverseModelMat, modelMatrix);
+        mat4.transpose(reverseModelMat, reverseModelMat);
+        Program.gl.uniformMatrix4fv(
+            Program.MTLColor_programInfo.uniformLocations.reverseModelMatrix,
+            false,
+            reverseModelMat);
+        Program.gl.uniform3fv(
+            Program.MTLColor_programInfo.uniformLocations.lightColor,
+            lightColor);
+        Program.gl.uniform3fv(
+            Program.MTLColor_programInfo.uniformLocations.lightDirection,
+            lightDirection);
+        // Program.gl.uniform3fv(
+        //     Program.Color_programInfo.uniformLocations.ambient,
+        //     ambientLight);
+        var eyePosition = vec3.fromValues(eye[0], eye[1], eye[2]);
+        Program.gl.uniform3fv(
+            Program.MTLColor_programInfo.uniformLocations.eyePosition,
+            eyePosition);
+        Program.gl.uniform1f(
+            Program.MTLColor_programInfo.uniformLocations.roughness,
+            0.3);
+        Program.gl.uniform1f(
+            Program.MTLColor_programInfo.uniformLocations.fresnel,
+            0.04);
+        {
+            const offset = 0;
+            const type = Program.gl.UNSIGNED_SHORT;
+            const vertexCount = buffers.indices.length;
+            //按连续的三角形方式以此按点绘制
+            Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
+        }
+    }
     function drawMTLTexture(Program, buffers, modelMatrix, viewMatrix, projectionMatrix, num, lightDirection) {
         //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
         {
@@ -1240,6 +1380,7 @@ window.onload = function () {
         var text_filepath3 = '../res/earth.jpg';
         var text_filepath4 = '../res/moon.jpg';
         var text_filepath5 = '../texture/plane.jpg';
+        // var text_filepath5 = '../texture/Palette.jpg';
         const Cubebuffer = initOneCube(Program, center, size, color);
         const ballbuffer1 = initTextureBall(Program, center1, radius1, color1);
         const ballbuffer2 = initTextureBall(Program, center2, radius2, color2);
@@ -1256,7 +1397,7 @@ window.onload = function () {
         const skyboxbuffer = initSkybox(Program);
 
         LoadObjFile(Program.gl, '../obj/VLJ19OBJ.obj', objDocArray, mtlDocArray, planeSize, false);
-        // LoadObjFile(Program.gl, '../obj/building/file.obj', objDocArray, mtlDocArray, planeSize, false);
+        // LoadObjFile(Program.gl, '../obj/city/file.obj', objDocArray, mtlDocArray, 0.00003, false);
         
         var fbo = initFramebufferObject(Program.gl);
         if (!fbo) {
@@ -1310,6 +1451,7 @@ window.onload = function () {
             if (crash == 0) {
                 if (mtlDocArray[0] && objDocArray[0]) {
                     getDrawingInfo(Program.gl, objbuffers, objDocArray[0], mtlDocArray[0]);
+                    // getColorDrawingInfo(Program.gl, objbuffers, objDocArray[0], mtlDocArray[0]);
                     if (objbuffers[0]) {
                         Program.gl.bindFramebuffer(Program.gl.FRAMEBUFFER, fbo);               // Change the drawing destination to FBO
                         Program.gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT); // Set view port for FBO
@@ -1327,6 +1469,7 @@ window.onload = function () {
                         Program.gl.viewport(0, 0, cw, ch);
                         Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);    // Clear color and depth buffer
                         drawMTLTexture(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, 4, lightDirection);
+                        // drawMTLColor(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
                         drawLine(Program, linebuffer1, line_modelMatrix1, viewMatrix, projectionMatrix);
                         drawLine(Program, linebuffer2, line_modelMatrix2, viewMatrix, projectionMatrix);
                     }
@@ -1413,5 +1556,56 @@ function getDrawingInfo(gl, buffers, objDocs, mtlDocs) {
         }
     }
     temp = initMTLTextBuffers(gl, positions, diffuse_colors, specular_colors, indices, normals, textureCoords, ambientLights);
+    buffers.push(temp);
+}
+
+function getColorDrawingInfo(gl, buffers, objDocs, mtlDocs) {
+
+    var positions = new Array(0);
+    var indices = new Array(0);
+    var normals = new Array(0);
+    var diffuse_colors = new Array(0);
+    var specular_colors = new Array(0);
+    var ambientLights = new Array(0);
+    var numIndices = 0;
+    for (var i = 0; i < objDocs.objects.length; i++) {
+        numIndices += objDocs.objects[i].numIndices;
+        //每一个objects[i].numIndices 是它的所有的face的顶点数加起来
+    }
+    // for(var i = 0; i < objDocs.textureCoords.length; i++)
+    //     textureCoords.push(objDocs.textureCoords[i].x, objDocs.textureCoords[i].y);
+    var index_indices = 0;
+    for (var i = 0; i < objDocs.objects.length; i++) {
+        var currentObject = objDocs.objects[i];
+        for (var j = 0; j < currentObject.faces.length; j++) {
+            var currentFace = currentObject.faces[j];
+            var currentMtl;
+            for (var k = 0; k < mtlDocs.mtls.length; k++)
+                if (mtlDocs.mtls[k].name === currentFace.materialName) {
+                    currentMtl = mtlDocs.mtls[k];
+                    break;
+                }
+
+            for (var k = 0; k < currentFace.vIndices.length; k++) {
+                if(currentMtl.Kd)
+                    diffuse_colors.push(currentMtl.Kd.r, currentMtl.Kd.g, currentMtl.Kd.b, 1);
+                if(currentMtl.Ks)
+                    specular_colors.push(currentMtl.Ks.r, currentMtl.Ks.g, currentMtl.Ks.b, 1);
+                if(currentMtl.Ka)
+                    ambientLights.push(currentMtl.Ka.r, currentMtl.Ka.g, currentMtl.Ka.b, 1);
+                indices.push(index_indices % numIndices);
+                var vIdx = currentFace.vIndices[k];
+                var nIdx = currentFace.nIndices[k];
+                positions.push(objDocs.vertices[vIdx].x, objDocs.vertices[vIdx].y, objDocs.vertices[vIdx].z);
+
+                if (nIdx >= 0)
+                    normals.push(objDocs.normals[nIdx].x, objDocs.normals[nIdx].y, objDocs.normals[nIdx].z);
+                else
+                    normals.push(currentFace.normal[0], currentFace.normal[1], currentFace.normal[2]);
+                index_indices++;
+            }
+        }
+    }
+    temp = initMTLColorBuffers(gl, positions, diffuse_colors, specular_colors, indices, normals, ambientLights);
     buffers.push(temp);
 }

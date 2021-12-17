@@ -73,7 +73,7 @@ function getWordLength(str, start) {
   var n = 0;
   for(var i = start, len = str.length; i < len; i++){
     var c = str.charAt(i);
-    if (c == '\t'|| c == ' ' || c == '(' || c == ')' || c == '"') 
+    if (c == '\t'|| c == ' ' || c == '(' || c == ')' || c == '"' || c == '\r') 
     break;
   }
   return i - start;
@@ -358,11 +358,12 @@ while ((line = lines[index++]) != null) {
             continue;
         //mtl
         case 'newmtl':
-            //非空说明刚读完一个mtl，准备读下一个，所以将其push
-            if(currentmaterial.name != ""){
-              mtl.mtls.push(currentmaterial);
-            }
-            currentmaterial.name = sp.getWord();
+          var materialname = sp.getWord();
+          var material  = new Material(materialname);
+          mtl.mtls.push(material);
+          currentmaterial = material;
+
+            // currentmaterial.name = sp.getWord();
             continue;
         //反射指数
         case 'Ns':
