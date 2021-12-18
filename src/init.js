@@ -1770,34 +1770,46 @@ function initOneCone(Program, center, radius, height, color) {
     const colors = [];
     const indices = [];
     const normals = [];
-    for (i = 0; i < 360; i += 1) {
+    for (i = 0; i < 360; i += 1) {//圆上的点
         positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
         positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
         positions.push(center[2]);
-    }
-    positions.push(center[0], center[1], center[2]);//圆心
-    positions.push(center[0], center[1], center[2] + height);//顶点
-
-    for (i = 0; i < 361; i = i + 1) {
         colors.push(color[0], color[1], color[2], color[3]);
-    }
-    colors.push(0.0, 0.0, 0.0, 1.0);//顶点弄成黑的
-    for (i = 0; i < 359; i += 1) {
-        indices.push(i, i + 1, 360);
         normals.push(0.0, 0.0, -1.0);
-        indices.push(i, i + 1, 361);
+    }
+    positions.push(center[0], center[1], center[2]);//圆心，360
+    colors.push(color[0], color[1], color[2], color[3]);
+    normals.push(0.0, 0.0, -1.0);
+    for (i = 0; i < 359; i += 1) {//圆面
+        indices.push(i, i + 1, 360);
+    }
+    indices.push(360, 359, 0);
+    for (i = 0; i < 360; i = i + 1) {
+        //360次顶点，361~720
+        positions.push(center[0], center[1], center[2] + height);//顶点
+        colors.push(0.0, 0.0, 0.0, 1.0);//顶点弄成黑的
+        //360个顶点法向量
         var vec1 = [radius * Math.cos(2 * Math.PI * i / 360.0), radius * Math.sin(2 * Math.PI * i / 360.0), -height];
         var vec2 = [radius * Math.cos(2 * Math.PI * (i + 1) / 360.0), radius * Math.sin(2 * Math.PI * (i + 1) / 360.0), -height];
         var vec3 = [vec1[1] * vec2[2] - vec1[2] * vec2[1], vec1[2] * vec2[0] - vec1[0] * vec2[2], vec1[0] * vec2[1] - vec1[1] * vec2[0]];
         normals.push(vec3[0], vec3[1], vec3[2]);
     }
-    indices.push(360, 359, 0);
-    normals.push(0.0, 0.0, -1.0);
-    indices.push(361, 359, 0);
-    var vec1 = [radius * Math.cos(2 * Math.PI * 359 / 360.0), radius * Math.sin(2 * Math.PI * 359 / 360.0), -height];
-    var vec2 = [radius * Math.cos(2 * Math.PI * 0 / 360.0), radius * Math.sin(2 * Math.PI * 0 / 360.0), -height];
-    var vec3 = [vec1[1] * vec2[2] - vec1[2] * vec2[1], vec1[2] * vec2[0] - vec1[0] * vec2[2], vec1[0] * vec2[1] - vec1[1] * vec2[0]];
-    normals.push(vec3[0], vec3[1], vec3[2]);
+    for (i = 0; i < 360; i = i + 1) {
+        //圆上的点，721~1080
+        positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
+        positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
+        positions.push(center[2]);
+        colors.push(color[0], color[1], color[2], color[3]);
+        //360个圆面上点的法向量
+        var vec1 = [radius * Math.cos(2 * Math.PI * i / 360.0), radius * Math.sin(2 * Math.PI * i / 360.0), -height];
+        var vec2 = [radius * Math.cos(2 * Math.PI * (i + 1) / 360.0), radius * Math.sin(2 * Math.PI * (i + 1) / 360.0), -height];
+        var vec3 = [vec1[1] * vec2[2] - vec1[2] * vec2[1], vec1[2] * vec2[0] - vec1[0] * vec2[2], vec1[0] * vec2[1] - vec1[1] * vec2[0]];
+        normals.push(vec3[0], vec3[1], vec3[2]);
+    }
+    for (i = 361; i < 720; i += 1) {
+        indices.push(i, i+360, i + 361);
+    }
+    indices.push(720,1080,721);
     const buffers = initBuffers(Program.gl, positions, colors, indices, normals);
     return buffers;
 }
@@ -1806,44 +1818,54 @@ function initOneCylinder(Program, center, radius, height, color) {
     const colors = [];
     const indices = [];
     const normals = [];
-    for (i = 0; i < 360; i += 1) {
+    for (i = 0; i < 360; i += 1) {//上底面圆的每一个点
         positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
         positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
         positions.push(center[2]);
+        normals.push(0.0, 0.0, -1.0);
+        colors.push(color[0], color[1], color[2], color[3]);
     }
-    for (i = 0; i < 360; i += 1) {
+    for (i = 0; i < 360; i += 1) {//下底面圆的每一个点
         positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
         positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
         positions.push(center[2] + height);
-    }
-    positions.push(center[0], center[1], center[2]);//上圆心 720
-    positions.push(center[0], center[1], center[2] + height);//下圆心  721
-
-    for (i = 0; i < 722; i = i + 1) {
+        normals.push(0.0, 0.0, 1.0);
         colors.push(color[0], color[1], color[2], color[3]);
     }
+    positions.push(center[0], center[1], center[2]);//上圆心 720
+    normals.push(0.0, 0.0, -1.0);
+    colors.push(color[0], color[1], color[2], color[3]);
+    positions.push(center[0], center[1], center[2] + height);//下圆心  721
+    normals.push(0.0, 0.0, 1.0);
+    colors.push(color[0], color[1], color[2], color[3]);
     for (i = 0; i < 359; i += 1) {
         indices.push(i, i + 1, 720);
-        normals.push(0.0, 0.0, -1.0);
         indices.push(i + 360, i + 361, 721);
-        normals.push(0.0, 0.0, 1.0);
     }
     indices.push(720, 359, 0);
-    normals.push(0.0, 0.0, -1.0);
     indices.push(721, 719, 360);
-    normals.push(0.0, 0.0, 1.0);
-    for (i = 0; i < 359; i += 1) {
+
+    for (i = 0; i < 360; i += 1) {//上底面圆的每一个点
+        positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
+        positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
+        positions.push(center[2]);
+        normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0), center[1] + radius * Math.sin(2 * Math.PI * i / 360.0), 0.0);
+        colors.push(color[0], color[1], color[2], color[3]);
+    }
+    for (i = 0; i < 360; i += 1) {//下底面圆的每一个点
+        positions.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0));
+        positions.push(center[1] + radius * Math.sin(2 * Math.PI * i / 360.0));
+        positions.push(center[2] + height);
+        normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0), center[1] + radius * Math.sin(2 * Math.PI * i / 360.0), 0.0);
+        colors.push(color[0], color[1], color[2], color[3]);
+    }
+
+    for (i = 722; i < 1081; i += 1) {
         indices.push(i, i + 360, i + 1);
         indices.push(i + 1, i + 360, i + 361);
-        // normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
-        // normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
     }
-    indices.push(359,0,719);
-    indices.push(0,719,360);
-    for (i = 0; i < 360; i += 1) {
-        normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
-        normals.push(center[0] + radius * Math.cos(2 * Math.PI * i / 360.0),center[1] + radius * Math.sin(2 * Math.PI * i / 360.0),0);
-    }
+    indices.push(1081, 722, 1441);
+    indices.push(722, 1441, 1082);
     const buffers = initBuffers(Program.gl, positions, colors, indices, normals);
     return buffers;
 }
