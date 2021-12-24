@@ -11,9 +11,52 @@
   <link href="./lib/bootstrap/css/bootstrap.min.css" type="text/css" rel="stylesheet">
   <script src="./lib/bootstrap/js/jquery.min.js"></script>
   <script src="./lib/bootstrap/js/bootstrap.min.js"></script>
+  <link href="main.css" rel="stylesheet"/>
 </head>
 
 <body>
+  <!-- 游戏开始 -->
+  <div class='window' id='start'>
+    <img src='res/start.jpeg' style='float: right' height="130px" width="170px"/>
+    <h1>Start Game</h1>
+    <h6>"  W S 加速减速</h6>
+    <h6>"  Q E 俯冲爬升</h6>
+    <h6>"  A D 转弯</h6>
+    <a href='#' onclick="Game_Start()">Start</a>
+  </div>
+
+  <!-- 游戏通关 -->
+  <div class='window' id='win'>
+    <img src='res/win.jfif' style='float: right' height="130px"/>
+    <h1>Win!!!</h1>
+    <!-- <h3>You lose</h3> -->
+    <a href="javascript:location.reload();">Replay</a>
+  </div>
+
+  <!-- 失败窗口 -->
+  <div class='window' id='oops'>
+    <img src='res/oops.webp' style='float: right' height="130px"/>
+    <h1>Oops!!!</h1>
+    <h3>You lose</h3>
+    <!-- <a href='#' onclick="Game_Restart()">Replay</a> -->
+    <a href="javascript:location.reload();">Replay</a>
+  </div>
+
+  <!-- 启动代码 -->
+  <script type="text/javascript">
+    // 隐藏元素
+    var hide = function(id) {
+      document.getElementById(id).style.display = "none";
+    }
+    // 显示元素
+    var show = function(id) {
+      document.getElementById(id).style.display = "block";
+    }
+    // 显示游戏开始
+    show("start");
+  </script>
+
+  <!-- WebGL -->
   <canvas id="glcanvas" width="1800" height="920" style="position:absolute;z-index:0;"></canvas>
   <canvas id="hud" width="1800" height="920" style="position:absolute;z-index:1;"></canvas>
   <p>
@@ -25,6 +68,8 @@
   <script src="./lib/cuon-utils.js"></script>
   <script src="./lib/cuon-matrix.js"></script>
   <script src="./lib/gl-matrix-min.js" defer></script>
+
+  
 
 </body>
 

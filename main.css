@@ -1,0 +1,20 @@
+.window {  
+    position: absolute;
+    margin: auto;
+    display: none;
+    background-color: rgb(35, 35, 28);
+    color: #fff; padding: 20px;
+    box-shadow: 0px 0px 20px #0000FF;
+    left: 40%; top: 25%; 
+    /* margin-left: 900; margin-top: 480; */
+    border-radius: 10px;
+    width: 400px; height: 200px;
+    /* z-index: window弹窗至于顶层 */
+    z-index: 999;
+}
+
+.window .petit {font-size: 8pt; font-style:italic }
+.window h1 {color: #999}
+.window h3 {color: #ff0000;}
+.window a {display: inline-block; width: 120px; height: 25px; font-weight: bold; text-align: center; border-radius: 2px; text-decoration: none; background-color: #ff5400; color: black}
+.window a {background-color: red; color: rgb(0, 0, 0); font-size: medium; font-style:oblique;}

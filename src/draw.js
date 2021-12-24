@@ -21,6 +21,28 @@ var planeIsRotating = 0;    // 飞机旋转状态
 var boom_time = 1000;       // 爆炸用计时器
 var prize_time = 1000;      // 得分用计时器
 
+/**
+ * 弹窗
+ */
+function Game_Start() {
+    speed = 8;  // 初始速度
+    document.getElementById("start").style.display = "none";
+}
+
+function Lose() {
+    document.getElementById("oops").style.display = "block";
+}
+
+function Game_Restart() {
+    // airCrash = 0;
+    // score = 0;
+    // translation = [0, 0, 0];
+    // speed = 8;
+    // nochange_translation = [0, 0, -25];
+    // modelxrotation = new Rotation(Math.PI / 2, [1, 0, 0]);
+    // ballSet.clear();
+    // show();
+}
 
 var eye = [0, 0, 6];
 var sum_deltaY = 0.0;
@@ -30,11 +52,11 @@ var up = [0, 2, 0];
 var cw = 0.0;
 var ch = 0.0;
 
-var speed = 8;          // speed: 飞机飞行速度
+var speed = 0;          // speed: 飞机飞行速度
 var del = 0.05;
 
 var translation = [0, 0, 0];                // 飞机的平移矩阵
-var nochange_translation = [0, 0, -25];     // 物体的平移矩阵
+var nochange_translation = [0, 0, -50];     // 物体的平移矩阵
 
 var lightColor = [1.0, 1.0, 1.0];
 var ambientLight = [0.4, 0.4, 0.4];
@@ -1330,7 +1352,6 @@ window.onload = function () {
 
     // 碰撞检测: crash - 坠毁标志
     function checkCollision() {
-        // console.log(scoreObjSet);
         if (airCrash) return;
         // 遍历所有obj
         var px = Math.abs(2.5 * planeSize * Math.cos(rotation.rad));
@@ -1338,15 +1359,16 @@ window.onload = function () {
         for (let i = 0; i < ballSet.length; i++) {
             // 碰撞
             if (ballSet[i].check(px, py, 1.5 * planeSize) && ballSet[i].exist) {
+                console.log("[Collision] " + i);
                 if(ballSet[i].type == 1) {  // 得分球
-                    change_score(); 
+                    change_score();
                     ++score;
                     scoreObjIndex = i;
                     ballSet[i].exist = false;
                     break;
                 }
-                if(ballSet[i].type == 0) {  // 爆炸球
-                    change_score(); 
+                else if(ballSet[i].type == 0) {  // 爆炸球
+                    change_score();
                     scoreObjIndex = i;
                     ballSet[i].exist = false;
                     change_crash();
@@ -1385,13 +1407,15 @@ window.onload = function () {
         /**
          * 得分球设置
          */
-        var numOfBalls = 6;
+        var numOfBalls = 50;
         // center
         var ballCenter = [];
         var ballHeight = 5.0
-        for(var i = 0; i < numOfBalls; ++i) {
-            var rand = Math.random() * 6 - 3;
-            ballCenter[i] = [rand * 2, ballHeight + rand, -(i+1)*10 ];  // 球的随机坐标
+        ballCenter[0] = [0,0,100];
+        ballCenter[1] = [0,0,110];
+        for(var i = 2; i < numOfBalls; ++i) {
+            var rand = Math.random() * 10 - 5;
+            ballCenter[i] = [rand * 2, ballHeight + rand, -(i+1)*15 ];  // 随机初始化球坐标
         }
         // radius
         var ballRadius = 0.8;
@@ -1401,22 +1425,28 @@ window.onload = function () {
         ballColor[1] = [80 / 255.0, 24 / 255.0, 21 / 255.0, 1.0];       // Black
         ballColor[2] = [60 / 255.0, 107 / 255.0, 176 / 255.0, 1.0];     // Blue
         ballColor[3] = [239 / 255.0, 169 / 255.0, 13 / 255.0, 1.0];     // Yellow
-
-
         /* 碰撞球: Texture, ballSet, buffers */
         var ballTextPath = [];
-        ballTextPath[0] = '../res/boom.jpg';        // crash 0
-        ballTextPath[1] = '../res/score.jfif';      // score 1        
+        ballTextPath[0] = '../res/boom.jpg';        // 爆炸球 - 0
+        ballTextPath[1] = '../res/score.jfif';      // 得分球 - 1
+        initTextures(Program, Program.gl, ballTextPath[0], 0);
+        initTextures(Program, Program.gl, ballTextPath[1], 1);
+        // 飞机纹理 - 2
+        var text_plane_path = '../texture/plane.jpg';
+        initTextures(Program, Program.gl, text_plane_path, 2);
+        // 地面纹理 - 3
+        initTextures(Program, Program.gl, "../res/ground.jpg", 3);
+        
         const ballBuffer = [];
-        var probOfCrashBall = 0.4;                  // 爆炸球的比例: 40%
+        var probOfCrashBall = 0.3;                  // 爆炸球的比例
         for(var i = 0; i < numOfBalls; ++i) {
             var rand = Math.random(); // Math.random(): 返回[0,1)的数
             if(rand < probOfCrashBall) {    // 爆炸球: type = 0
-                initTextures(Program, Program.gl, ballTextPath[0], i);
+                // initTextures(Program, Program.gl, ballTextPath[0], i);
                 ballSet.push(new crashObj( i, ballCenter[i], ballRadius, ballRadius, ballRadius, 0));
             }
             else {                          // 得分球: type = 1
-                initTextures(Program, Program.gl, ballTextPath[1], i);
+                // initTextures(Program, Program.gl, ballTextPath[1], i);
                 ballSet.push(new crashObj( i, ballCenter[i], ballRadius, ballRadius, ballRadius, 1));
             }
             ballBuffer[i] = initTextureBall(
@@ -1432,8 +1462,7 @@ window.onload = function () {
         var end1 = [-2.0, 0.0, 5.0];
         var end2 = [2.0, 0.0, 5.0];
         var size_line = [0.03, 0.01];
-        var text_plane_path = '../texture/plane.jpg';       // 飞机纹理
-        initTextures(Program, Program.gl, text_plane_path, 4);
+        
         
         /**
          * 圆柱、圆锥参数
@@ -1454,6 +1483,7 @@ window.onload = function () {
         const prizeparticlebuffer = initParticle(Program, [0,0,0], gold, 1000, 0.8, 0.5, 0.05);
         const boomparticlebuffer = initParticle(Program, center, black, 5000, 1.6, 0.5, 0.3);
         
+        // 地面
         var centerPlane = [0.0, -2.0, 0.0];
         const planebuffer = initPlane(Program, centerPlane, size_plane, ballColor[2]);
 
@@ -1480,6 +1510,11 @@ window.onload = function () {
         var then = 0;
         // Draw the scene repeatedly
         function render(now) {
+            // console.log(nochange_translation);
+            if(nochange_translation[2] > numOfBalls * 15 + 100) {
+                document.getElementById("win").style.display = "block";
+                speed = 3;
+            }
             // 飞机方向纠正
             if(!planeIsRotating) {
                 if(rotation.rad > 0.03)
@@ -1530,27 +1565,31 @@ window.onload = function () {
                         Program.gl.bindFramebuffer(Program.gl.FRAMEBUFFER, fbo);                        // Change the drawing destination to FBO
                         Program.gl.viewport(0, 0, OFFSCREEN_HEIGHT, OFFSCREEN_HEIGHT);                  // Set view port for FBO
                         Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);    // Clear FBO  
-
+                        
                         drawShadow(Program, objbuffers[0], aircraft_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
-                        drawShadow(Program, linebuffer1, line_modelMatrix1, viewMatrixFromLight, projectionMatrixFromLight);
-                        drawShadow(Program, linebuffer2, line_modelMatrix2, viewMatrixFromLight, projectionMatrixFromLight);
+
+                        // 飞机气流阴影
+                        // drawShadow(Program, linebuffer1, line_modelMatrix1, viewMatrixFromLight, projectionMatrixFromLight);
+                        // drawShadow(Program, linebuffer2, line_modelMatrix2, viewMatrixFromLight, projectionMatrixFromLight);
+                        
                         // 球体阴影
                         for(var i = 0; i < numOfBalls; ++i) {
                             if(ballSet[i].exist)
                                 drawShadow(Program, ballBuffer[i], ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                         }
-
-                        // 圆柱和圆锥
-                        drawShadow(Program, conebuffer, cone_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
-                        drawShadow(Program, cylinderbuffer, cylinder_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                        // 圆柱和圆锥 - 阴影
+                        // drawShadow(Program, conebuffer, cone_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                        // drawShadow(Program, cylinderbuffer, cylinder_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                         
                         Program.gl.bindFramebuffer(Program.gl.FRAMEBUFFER, null);               // Change the drawing destination to color buffer
                         Program.gl.viewport(0, 0, cw, ch);
                         Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);    // Clear color and depth buffer
-                        drawMTLTexture(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, 4, lightDirection);
+
+                        // 飞机纹理
+                        drawMTLTexture(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, 2, lightDirection);
                         // drawMTLColor(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
                         
-                        // 画线
+                        // 飞机气流
                         drawLine(Program, linebuffer1, line_modelMatrix1, viewMatrix, projectionMatrix);
                         drawLine(Program, linebuffer2, line_modelMatrix2, viewMatrix, projectionMatrix);
                     }
@@ -1567,26 +1606,31 @@ window.onload = function () {
             else {  // 飞机爆炸
                 drawParticle(Program, boomparticlebuffer, boom_time, boom_modelMatrix, viewMatrix, projectionMatrix);
                 boom_time = boom_time + 0.001;
+                // 爆炸粒子结束: 弹窗
+                if(boom_time > 0.2) {
+                    Lose();
+                }
             }
             /* 天气控制 */
             if (weather == 0) {     // 0 - 晴天
                 drawSkybox(Program, skyboxbuffer, now / 20, skybox, viewMatrix, projectionMatrix, lightDirection);
-                drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight);
-                // 球
-                for(var i = 0; i < numOfBalls; ++i) {
-                    drawTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, i, lightDirection);
-                }
             }
             if (weather == 1) {     // 1 - 雾天
                 drawfogSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
-                drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight);
-                // 球
-                for(var i = 0; i < numOfBalls; ++i) {
-                    drawfogTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, i, lightDirection);
-                }
-                // draw(Program,conebuffer,cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
-                // draw(Program,cylinderbuffer,cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
             }
+            // 地面
+            // drawTexture(Program, ballBuffer[0], plane_modelMatrix, viewMatrix, projectionMatrix, 2, lightDirection);
+            // drawfogTexture(Program, planebuffer, ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
+            drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+            
+            // 球
+            for(var i = 0; i < numOfBalls; ++i) {
+                if(ballSet[i].exist) {
+                    drawfogTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
+                }
+            }
+            // draw(Program,conebuffer,cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
+            // draw(Program,cylinderbuffer,cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
             nochange_translation[2] += deltaTime * speed;   // 让飞机每秒都按速度向前
         }
         requestAnimationFrame(render);

@@ -1159,11 +1159,11 @@ function handleKeyDown(event) {
     if(airCrash) return;    // 飞机已坠毁, 禁用控制
     //currentlyPressedKeys[event.keyCode] = true;
     if (String.fromCharCode(event.keyCode) == "W") {        // 加速，model和view同步
-        if(speed < 12) speed += del;    // 飞机最大速度12
+        if(speed < 24) speed += del;    // 飞机最大速度
     }
     else if (String.fromCharCode(event.keyCode) == "A") {   // 飞机向左的旋转效果
         planeIsRotating = true;
-        translation[0] -= del / 2;
+        translation[0] -= del;
         if(rotation.rad < 0.7)
             rotation.rad += del / 2;
         rotation.axis = [0, 0, 1];
@@ -1175,7 +1175,7 @@ function handleKeyDown(event) {
     }
     else if (String.fromCharCode(event.keyCode) == "D") {   // 飞机向右的旋转效果
         planeIsRotating = true;
-        translation[0] += del / 2;
+        translation[0] += del;
         if(rotation.rad > -0.7)
             rotation.rad -= del / 2;
         rotation.axis = [0, 0, 1];
@@ -1792,6 +1792,8 @@ function initLineCube(Program, start, end, size) {
     const buffers = initPlaneBuffers(Program.gl, positions, colors, indices);
     return buffers;
 }
+
+/* Cone */
 function initOneCone(Program, center, radius, height, color) {
     const positions = [];
     const colors = [];
@@ -1840,6 +1842,7 @@ function initOneCone(Program, center, radius, height, color) {
     const buffers = initBuffers(Program.gl, positions, colors, indices, normals);
     return buffers;
 }
+/* Cylinder */
 function initOneCylinder(Program, center, radius, height, color) {
     const positions = [];
     const colors = [];
