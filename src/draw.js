@@ -62,7 +62,7 @@ var lightColor = [1.0, 1.0, 1.0];
 var ambientLight = [0.4, 0.4, 0.4];
 var fogdenisty = 0.3;
 
-var light_Scale = 20.0;
+var light_Scale = 50.0;
 
 
 var Rotation = function (rad, axis) {
@@ -128,9 +128,11 @@ function loadTexture(gl, texture, image, index) {
         gl.generateMipmap(gl.TEXTURE_2D);
     }
     else {
+        if(index != 3){
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);    
+        }
         // No, it's not a power of 2. Turn of mips and set wrapping to clamp to edge
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     }
 }
@@ -346,75 +348,7 @@ function drawParticle(Program, buffers, time, modelMatrix, viewMatrix, projectio
         Program.gl.drawElements(Program.gl.POINTS, vertexCount, type, offset);
     }
 }
-function drawPlane(Program, buffer, modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight) {
-    {
-        const numComponents = 3;//每次取出3个数值
-        const type = Program.gl.FLOAT;//取出数据为浮点数类型
-        const normalize = false;
-        const stride = 0;
-        const offset = 0;
-        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.position);
-        Program.gl.vertexAttribPointer(
-            Program.plane_programInfo.attribLocations.vertexPosition,
-            numComponents,
-            type,
-            normalize,
-            stride,
-            offset);
-        Program.gl.enableVertexAttribArray(
-            Program.plane_programInfo.attribLocations.vertexPosition);
-    }
-    //为webGL设置从缓冲区抽取颜色数据的属性值，将其放入着色器信息
-    {
-        const numComponents = 4;//每次取出4个数值
-        const type = Program.gl.FLOAT;//取出数据为浮点数类型
-        const normalize = false;
-        const stride = 0;
-        const offset = 0;
-        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.color);
-        Program.gl.vertexAttribPointer(
-            Program.plane_programInfo.attribLocations.vertexColor,
-            numComponents,
-            type,
-            normalize,
-            stride,
-            offset);
-        Program.gl.enableVertexAttribArray(
-            Program.plane_programInfo.attribLocations.vertexColor);
-    }
-    // Tell WebGL which indices to use to index the vertices
-    Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffer.index);
-    //webGL使用此程序进行绘制
-    Program.gl.useProgram(Program.plane_programInfo.program);
-    Program.gl.uniform1i(Program.plane_programInfo.uniformLocations.uShadowMap, 7);
-    Program.gl.uniformMatrix4fv(
-        Program.plane_programInfo.uniformLocations.projectionMatrix,
-        false,
-        projectionMatrix);
-    Program.gl.uniformMatrix4fv(
-        Program.plane_programInfo.uniformLocations.viewMatrix,
-        false,
-        viewMatrix);
-    Program.gl.uniformMatrix4fv(
-        Program.plane_programInfo.uniformLocations.projectionMatrixFromLight,
-        false,
-        projectionMatrixFromLight);
-    Program.gl.uniformMatrix4fv(
-        Program.plane_programInfo.uniformLocations.viewMatrixFromLight,
-        false,
-        viewMatrixFromLight);
-    Program.gl.uniformMatrix4fv(
-        Program.plane_programInfo.uniformLocations.modelMatrix,
-        false,
-        modelMatrix);
-    {
-        const offset = 0;
-        const type = Program.gl.UNSIGNED_SHORT;
-        const vertexCount = buffer.indices.length;
-        //按连续的三角形方式以此按点绘制
-        Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
-    }
-}
+
 function drawLine(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
     //为webGL设置从缓冲区抽取位置数据的属性值，将其放入着色器信息
     {
@@ -792,6 +726,112 @@ window.onload = function () {
             const offset = 0;
             const type = Program.gl.UNSIGNED_SHORT;
             const vertexCount = buffers.indices.length;
+            //按连续的三角形方式以此按点绘制
+            Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
+        }
+    }
+    function drawPlane(Program, buffer, modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight, num, lightDirection) {
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.position);
+            Program.gl.vertexAttribPointer(
+                Program.plane_programInfo.attribLocations.vertexPosition,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.plane_programInfo.attribLocations.vertexPosition);
+        }
+        //法向量
+        {
+            const numComponents = 3;//每次取出3个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.normal);
+            Program.gl.vertexAttribPointer(
+                Program.plane_programInfo.attribLocations.normal,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.plane_programInfo.attribLocations.normal);
+        }
+        //为webGL设置从缓冲区抽取纹理数据的属性值，将其放入着色器信息
+        {
+            const numComponents = 2;//每次取出2个数值
+            const type = Program.gl.FLOAT;//取出数据为浮点数类型
+            const normalize = false;
+            const stride = 0;
+            const offset = 0;
+            Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffer.TextCoord);
+            Program.gl.vertexAttribPointer(
+                Program.plane_programInfo.attribLocations.TextCoord,
+                numComponents,
+                type,
+                normalize,
+                stride,
+                offset);
+            Program.gl.enableVertexAttribArray(
+                Program.plane_programInfo.attribLocations.TextCoord);
+        }
+        // Tell WebGL which indices to use to index the vertices
+        Program.gl.bindBuffer(Program.gl.ELEMENT_ARRAY_BUFFER, buffer.index);
+        //webGL使用此程序进行绘制
+        Program.gl.useProgram(Program.plane_programInfo.program);
+        Program.gl.uniform1i(Program.plane_programInfo.uniformLocations.uShadowMap, 7);
+        Program.gl.uniformMatrix4fv(
+            Program.plane_programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.plane_programInfo.uniformLocations.viewMatrix,
+            false,
+            viewMatrix);
+        Program.gl.uniformMatrix4fv(
+            Program.plane_programInfo.uniformLocations.projectionMatrixFromLight,
+            false,
+            projectionMatrixFromLight);
+        Program.gl.uniformMatrix4fv(
+            Program.plane_programInfo.uniformLocations.viewMatrixFromLight,
+            false,
+            viewMatrixFromLight);
+        Program.gl.uniformMatrix4fv(
+            Program.plane_programInfo.uniformLocations.modelMatrix,
+            false,
+            modelMatrix);
+        const reverseModelMat = mat4.create();
+        mat4.invert(reverseModelMat, modelMatrix);
+        mat4.transpose(reverseModelMat, reverseModelMat);
+        Program.gl.uniformMatrix4fv(
+            Program.plane_programInfo.uniformLocations.reverseModelMatrix,
+            false,
+            reverseModelMat);
+        Program.gl.uniform3fv(
+            Program.plane_programInfo.uniformLocations.lightColor,
+            lightColor);
+        Program.gl.uniform3fv(
+            Program.plane_programInfo.uniformLocations.lightDirection,
+            lightDirection);
+        Program.gl.uniform3fv(
+            Program.plane_programInfo.uniformLocations.ambient,
+            ambientLight);
+        Program.gl.uniform1i(
+            Program.plane_programInfo.uniformLocations.Sampler,
+            num);
+        {
+            const offset = 0;
+            const type = Program.gl.UNSIGNED_SHORT;
+            const vertexCount = buffer.indices.length;
             //按连续的三角形方式以此按点绘制
             Program.gl.drawElements(Program.gl.TRIANGLES, vertexCount, type, offset);
         }
@@ -1320,7 +1360,7 @@ window.onload = function () {
     }
 
     function setProjectionMatrixFromLight(gl) {
-        const fieldOfView = 45 * Math.PI / 180;   // in radians
+        const fieldOfView = 75 * Math.PI / 180;   // in radians
         const aspect = OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT;
         const zNear = 0.1;
         const zFar = 1000.0;
@@ -1484,8 +1524,8 @@ window.onload = function () {
         const boomparticlebuffer = initParticle(Program, center, black, 5000, 1.6, 0.5, 0.3);
         
         // 地面
-        var centerPlane = [0.0, -2.0, 0.0];
-        const planebuffer = initPlane(Program, centerPlane, size_plane, ballColor[2]);
+        var centerPlane = [0.0, -15.0, 0.0];
+        const planebuffer = initPlane(Program, centerPlane, size_plane);
 
         // 天空盒
         const skyboxbuffer = initSkybox(Program);
@@ -1621,7 +1661,7 @@ window.onload = function () {
             // 地面
             // drawTexture(Program, ballBuffer[0], plane_modelMatrix, viewMatrix, projectionMatrix, 2, lightDirection);
             // drawfogTexture(Program, planebuffer, ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
-            drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+            drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight,3, lightDirection);
             
             // 球
             for(var i = 0; i < numOfBalls; ++i) {

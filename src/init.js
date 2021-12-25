@@ -769,29 +769,43 @@ function initProgram() {
     `;
     const plane_vsSource = `
     attribute vec4 a_Position;
-    attribute vec4 a_Color;
+    attribute vec4 aNormal; //法向量
+    attribute vec2 aTextCoord; //纹理
 
     uniform mat4 uModelMatrix;  //模型矩阵，用于定位模型位置
     uniform mat4 uProjectionMatrixFromLight;//光源角度的投影矩阵
     uniform mat4 uViewMatrixFromLight;//光源角度的视角矩阵
     uniform mat4 uProjectionMatrix;  //投影矩阵，用于定位投影
     uniform mat4 uViewMatrix;  //视角矩阵，用于定位观察位置
+    uniform mat4 uReverseModelMatrix; //模型矩阵的逆转置
 
     varying vec4 v_PositionFromLight;
-    varying vec4 v_Color;
+    varying vec3 v_Normal;
+    varying vec4 v_Position;
+    varying vec2 v_TextCoord;
+
     void main() {
         gl_Position =  uProjectionMatrix * uViewMatrix * uModelMatrix * a_Position; 
+        v_Normal = normalize(vec3(uReverseModelMatrix * aNormal));
+        v_Position = uModelMatrix * a_Position;
+        v_TextCoord = aTextCoord;
         v_PositionFromLight =uProjectionMatrixFromLight * uViewMatrixFromLight * uModelMatrix * a_Position;
-        v_Color = a_Color;
     }
     `;
     const plane_fsSource = `
     precision mediump float;
 
     uniform sampler2D uShadowMap;
+    uniform sampler2D uSampler;
+
+    uniform vec3 uLightColor; //光颜色强度
+    uniform vec3 uLightDirection; //光线方向
+    uniform vec3 uAmbientLight; // 环境光
 
     varying vec4 v_PositionFromLight;
-    varying vec4 v_Color;
+    varying vec3 v_Normal;
+    varying vec4 v_Position;
+    varying vec2 v_TextCoord;
 
     float unpackDepth(const in vec4 rgbaDepth) {
         const vec4 bitShift = vec4(1.0, 1.0/256.0, 1.0/(256.0 * 256.0), 1.0/(256.0 * 256.0 * 256.0));
@@ -800,13 +814,21 @@ function initProgram() {
     }
 
     void main() {
+        vec4 v_Color=texture2D(uSampler,v_TextCoord);
+        vec3 lightDirection = normalize(uLightDirection);
+        //计算cos入射角 当角度大于90 说明光照在背面 赋值为0
+        float nDotLight = max(dot(lightDirection, v_Normal), 0.0);
+        //计算漫反射光颜色
+        vec3 diffuse = uLightColor * v_Color.rgb * nDotLight;
+        // 环境反射光颜色
+        vec3 ambient = uAmbientLight * v_Color.rgb;
+        vec4 tmp_Color = vec4(diffuse + ambient, v_Color.a);
+
         vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
         vec4 rgbaDepth = texture2D(uShadowMap, shadowCoord.xy);
         float depth = unpackDepth(rgbaDepth);
-        // float depth = rgbaDepth.r;
         float visibility =(shadowCoord.z > depth + 0.0015)? 0.7:1.0;
-        gl_FragColor = vec4(v_Color.rgb * visibility, v_Color.a);
-        
+        gl_FragColor = vec4(tmp_Color.rgb * visibility, tmp_Color.a);
     }
     `;
     const line_vsSource = `
@@ -1031,7 +1053,8 @@ function initProgram() {
         program: plane_shaderProgram,
         attribLocations: {
             vertexPosition: gl.getAttribLocation(plane_shaderProgram, 'a_Position'),
-            vertexColor: gl.getAttribLocation(plane_shaderProgram, 'a_Color'),
+            normal: gl.getAttribLocation(plane_shaderProgram, 'aNormal'),
+            TextCoord: gl.getAttribLocation(plane_shaderProgram, 'aTextCoord'),
         },
         uniformLocations: {
             projectionMatrix: gl.getUniformLocation(plane_shaderProgram, 'uProjectionMatrix'),
@@ -1040,6 +1063,11 @@ function initProgram() {
             viewMatrixFromLight: gl.getUniformLocation(plane_shaderProgram, 'uViewMatrixFromLight'),
             modelMatrix: gl.getUniformLocation(plane_shaderProgram, 'uModelMatrix'),
             uShadowMap: gl.getUniformLocation(plane_shaderProgram, 'uShadowMap'),
+            reverseModelMatrix: gl.getUniformLocation(plane_shaderProgram, 'uReverseModelMatrix'),
+            Sampler: gl.getUniformLocation(plane_shaderProgram, 'uSampler'),
+            lightColor: gl.getUniformLocation(plane_shaderProgram, 'uLightColor'),
+            lightDirection: gl.getUniformLocation(plane_shaderProgram, 'uLightDirection'),
+            ambient: gl.getUniformLocation(plane_shaderProgram, 'uAmbientLight'),
         },
     };
     const line_programInfo = {
@@ -1156,15 +1184,15 @@ function handleMouseMove(event) {
 }
 
 function handleKeyDown(event) {
-    if(airCrash) return;    // 飞机已坠毁, 禁用控制
+    if (airCrash) return;    // 飞机已坠毁, 禁用控制
     //currentlyPressedKeys[event.keyCode] = true;
     if (String.fromCharCode(event.keyCode) == "W") {        // 加速，model和view同步
-        if(speed < 24) speed += del;    // 飞机最大速度
+        if (speed < 24) speed += del;    // 飞机最大速度
     }
     else if (String.fromCharCode(event.keyCode) == "A") {   // 飞机向左的旋转效果
         planeIsRotating = true;
         translation[0] -= del;
-        if(rotation.rad < 0.7)
+        if (rotation.rad < 0.7)
             rotation.rad += del / 2;
         rotation.axis = [0, 0, 1];
     }
@@ -1176,15 +1204,15 @@ function handleKeyDown(event) {
     else if (String.fromCharCode(event.keyCode) == "D") {   // 飞机向右的旋转效果
         planeIsRotating = true;
         translation[0] += del;
-        if(rotation.rad > -0.7)
+        if (rotation.rad > -0.7)
             rotation.rad -= del / 2;
         rotation.axis = [0, 0, 1];
     }
     else if (String.fromCharCode(event.keyCode) == "Q") {   // 飞机向下
         planeIsRotating = true;
         // console.log("modelxrotation =" + modelxrotation.rad);
-        if(modelxrotation.rad > 1.3)
-        modelxrotation.rad -= del / 2;
+        if (modelxrotation.rad > 1.3)
+            modelxrotation.rad -= del / 2;
         // if(rotation.rad > -0.7)
         //     rotation.rad -= del;
         // rotation.axis = [1, 0, 0];
@@ -1193,7 +1221,7 @@ function handleKeyDown(event) {
     else if (String.fromCharCode(event.keyCode) == "E") {   // 飞机向上
         planeIsRotating = true;
         // console.log("modelxrotation =" + modelxrotation.rad);
-        if(modelxrotation.rad < 2.2)
+        if (modelxrotation.rad < 2.2)
             modelxrotation.rad += del / 2;
         // if(rotation.rad < 0.7)
         //     rotation.rad += del / 2;
@@ -1210,7 +1238,7 @@ function handleKeyDown(event) {
     }
 }
 function handleKeyUp(event) {
-    if(String.fromCharCode(event.keyCode) == "E" || String.fromCharCode(event.keyCode) == "Q" || String.fromCharCode(event.keyCode) == "A" || String.fromCharCode(event.keyCode) == "D") {
+    if (String.fromCharCode(event.keyCode) == "E" || String.fromCharCode(event.keyCode) == "Q" || String.fromCharCode(event.keyCode) == "A" || String.fromCharCode(event.keyCode) == "D") {
         planeIsRotating = false;
     }
 }
@@ -1411,26 +1439,32 @@ function initParticleBuffers(gl, start, end, lifetime, color, indices) {
         indices: indices,
     }
 }
-function initPlaneBuffers(gl, positions, colors, indices) {
+function initPlaneBuffers(gl, positions, indices, normals, TextCoord) {
     //顶点缓冲区
     const positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-    //为颜色创建缓冲区
-    const colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
 
     //索引缓冲区
     const indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
+    //法向量缓冲区
+    const normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, normalBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+    
+    //纹理缓冲区
+    const TextureBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, TextureBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TextCoord), gl.STATIC_DRAW);
+
     return {
         position: positionBuffer,
-        color: colorBuffer,
+        normal: normalBuffer,
         index: indexBuffer,
+        TextCoord: TextureBuffer,
         indices: indices,
     }
 }
@@ -1675,28 +1709,62 @@ function initParticle(Program, center, color, num, startscale, endscale, speed) 
     const buffers = initParticleBuffers(Program.gl, start, end, lifetime, colors, indices);
     return buffers;
 }
-function initPlane(Program, center, size, color) {
+function initPlane(Program, center, size) {
+    var scale_x=10.0;
+    var scale_z=100.0;
+    const point = [center[0]- size[0]/2,center[1]- size[1]/2,center[2]- size[2]/2];
     const positions = [];
-    const colors = [];
-    const indices = [
-        0, 1, 2,
-        3, 4, 5
-    ];
-    {
-        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
-        colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
-        colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
-        colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
-        colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
-        colors.push(color[0], color[1], color[2], color[3]);
-        positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
-        colors.push(color[0], color[1], color[2], color[3]);
+    const indices = [];
+    const normals = [];
+    const TextCoord = [];
+    var step_x=size[0]/scale_x;
+    var step_z=size[2]/scale_z;
+    for(var i=0;i<scale_x;i++) {
+        for(var j=0;j<scale_z;j++) {
+            positions.push(point[0]+(i+1)*step_x,point[1]+size[1] / 2,point[2]+(j+1)*step_z);
+            positions.push(point[0]+i*step_x,point[1]+size[1] / 2,point[2]+(j+1)*step_z);
+            positions.push(point[0]+(i+1)*step_x,point[1]+size[1] / 2,point[2]+j*step_z);
+            positions.push(point[0]+i*step_x,point[1]+size[1] / 2,point[2]+j*step_z);
+            positions.push(point[0]+i*step_x,point[1]+size[1] / 2,point[2]+(j+1)*step_z);
+            positions.push(point[0]+(i+1)*step_x,point[1]+size[1] / 2,point[2]+j*step_z);
+            normals.push(0.0, 1.0, 0.0);
+            normals.push(0.0, 1.0, 0.0);
+            normals.push(0.0, 1.0, 0.0);
+            normals.push(0.0, 1.0, 0.0);
+            normals.push(0.0, 1.0, 0.0);
+            normals.push(0.0, 1.0, 0.0);
+            TextCoord.push(1.0, 1.0);
+            TextCoord.push(0.0, 1.0);
+            TextCoord.push(1.0, 0.0);
+            TextCoord.push(0.0, 0.0);
+            TextCoord.push(0.0, 1.0);
+            TextCoord.push(1.0, 0.0);
+            indices.push((i*scale_z+j)*6,(i*scale_z+j)*6+1,(i*scale_z+j)*6+2,(i*scale_z+j)*6+3,(i*scale_z+j)*6+4,(i*scale_z+j)*6+5);
+        }
     }
-    const buffers = initPlaneBuffers(Program.gl, positions, colors, indices);
+    // for(var i=0;i<scale;i++){
+    //     positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
+    //     positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
+    //     positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
+    //     positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
+    //     positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
+    //     positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
+    //     normals.push(0.0, 1.0, 0.0);
+    //     normals.push(0.0, 1.0, 0.0);
+    //     normals.push(0.0, 1.0, 0.0);
+    //     normals.push(0.0, 1.0, 0.0);
+    //     normals.push(0.0, 1.0, 0.0);
+    //     normals.push(0.0, 1.0, 0.0);
+    //     TextCoord.push(1.0, 1.0);
+    //     TextCoord.push(0.0, 1.0);
+    //     TextCoord.push(1.0, 0.0);
+    //     TextCoord.push(0.0, 0.0);
+    //     TextCoord.push(0.0, 1.0);
+    //     TextCoord.push(1.0, 0.0);
+    //     indices.push(i*6,i*6+1,i*6+2,i*6+3,i*6+4,i*6+5);
+    // }
+
+    const buffers = initPlaneBuffers(Program.gl, positions, indices, normals, TextCoord);
     return buffers;
 }
 
@@ -1836,9 +1904,9 @@ function initOneCone(Program, center, radius, height, color) {
         normals.push(vec3[0], vec3[1], vec3[2]);
     }
     for (i = 361; i < 720; i += 1) {
-        indices.push(i, i+360, i + 361);
+        indices.push(i, i + 360, i + 361);
     }
-    indices.push(720,1080,721);
+    indices.push(720, 1080, 721);
     const buffers = initBuffers(Program.gl, positions, colors, indices, normals);
     return buffers;
 }
