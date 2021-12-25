@@ -801,6 +801,7 @@ function initProgram() {
     uniform vec3 uLightColor; //光颜色强度
     uniform vec3 uLightDirection; //光线方向
     uniform vec3 uAmbientLight; // 环境光
+    uniform float plane_height; //飞机高度
 
     varying vec4 v_PositionFromLight;
     varying vec3 v_Normal;
@@ -828,7 +829,9 @@ function initProgram() {
         vec4 rgbaDepth = texture2D(uShadowMap, shadowCoord.xy);
         float depth = unpackDepth(rgbaDepth);
         float visibility =(shadowCoord.z > depth + 0.0015)? 0.7:1.0;
-        gl_FragColor = vec4(tmp_Color.rgb * visibility, tmp_Color.a);
+        // gl_FragColor = vec4(tmp_Color.rgb * visibility, 1.0-plane_height/50.0);
+        gl_FragColor = vec4(tmp_Color.rgb * visibility, 1.0);
+
     }
     `;
     const line_vsSource = `
@@ -1068,6 +1071,7 @@ function initProgram() {
             lightColor: gl.getUniformLocation(plane_shaderProgram, 'uLightColor'),
             lightDirection: gl.getUniformLocation(plane_shaderProgram, 'uLightDirection'),
             ambient: gl.getUniformLocation(plane_shaderProgram, 'uAmbientLight'),
+            plane_height: gl.getUniformLocation(plane_shaderProgram, 'plane_height'),
         },
     };
     const line_programInfo = {
@@ -1217,16 +1221,17 @@ function handleKeyDown(event) {
         //     rotation.rad -= del;
         // rotation.axis = [1, 0, 0];
         nochange_translation[1] += del;
+        plane_translation[1] += del * 50;
+        plane_height -= 3.0;
+
     }
     else if (String.fromCharCode(event.keyCode) == "E") {   // 飞机向上
         planeIsRotating = true;
-        // console.log("modelxrotation =" + modelxrotation.rad);
         if (modelxrotation.rad < 2.2)
             modelxrotation.rad += del / 2;
-        // if(rotation.rad < 0.7)
-        //     rotation.rad += del / 2;
-        // rotation.axis = [1, 0, 0];
         nochange_translation[1] -= del;
+        plane_translation[1] -= del * 50;
+        plane_height += 3.0;
     }
     else if (String.fromCharCode(event.keyCode) == "Z") {//Zoom to fit
         var distance = Math.pow(eye[0] - target[0], 2) + Math.pow(eye[1] - target[1], 2) + Math.pow(eye[2] - target[2], 2);
@@ -1454,7 +1459,7 @@ function initPlaneBuffers(gl, positions, indices, normals, TextCoord) {
     const normalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, normalBuffer);
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
-    
+
     //纹理缓冲区
     const TextureBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, TextureBuffer);
@@ -1710,23 +1715,23 @@ function initParticle(Program, center, color, num, startscale, endscale, speed) 
     return buffers;
 }
 function initPlane(Program, center, size) {
-    var scale_x=10.0;
-    var scale_z=100.0;
-    const point = [center[0]- size[0]/2,center[1]- size[1]/2,center[2]- size[2]/2];
+    var scale_x = 10.0;
+    var scale_z = 100.0;
+    const point = [center[0] - size[0] / 2, center[1] - size[1] / 2, center[2] - size[2] / 2];
     const positions = [];
     const indices = [];
     const normals = [];
     const TextCoord = [];
-    var step_x=size[0]/scale_x;
-    var step_z=size[2]/scale_z;
-    for(var i=0;i<scale_x;i++) {
-        for(var j=0;j<scale_z;j++) {
-            positions.push(point[0]+(i+1)*step_x,point[1]+size[1] / 2,point[2]+(j+1)*step_z);
-            positions.push(point[0]+i*step_x,point[1]+size[1] / 2,point[2]+(j+1)*step_z);
-            positions.push(point[0]+(i+1)*step_x,point[1]+size[1] / 2,point[2]+j*step_z);
-            positions.push(point[0]+i*step_x,point[1]+size[1] / 2,point[2]+j*step_z);
-            positions.push(point[0]+i*step_x,point[1]+size[1] / 2,point[2]+(j+1)*step_z);
-            positions.push(point[0]+(i+1)*step_x,point[1]+size[1] / 2,point[2]+j*step_z);
+    var step_x = size[0] / scale_x;
+    var step_z = size[2] / scale_z;
+    for (var i = 0; i < scale_x; i++) {
+        for (var j = 0; j < scale_z; j++) {
+            positions.push(point[0] + (i + 1) * step_x, point[1] + size[1] / 2, point[2] + (j + 1) * step_z);
+            positions.push(point[0] + i * step_x, point[1] + size[1] / 2, point[2] + (j + 1) * step_z);
+            positions.push(point[0] + (i + 1) * step_x, point[1] + size[1] / 2, point[2] + j * step_z);
+            positions.push(point[0] + i * step_x, point[1] + size[1] / 2, point[2] + j * step_z);
+            positions.push(point[0] + i * step_x, point[1] + size[1] / 2, point[2] + (j + 1) * step_z);
+            positions.push(point[0] + (i + 1) * step_x, point[1] + size[1] / 2, point[2] + j * step_z);
             normals.push(0.0, 1.0, 0.0);
             normals.push(0.0, 1.0, 0.0);
             normals.push(0.0, 1.0, 0.0);
@@ -1739,7 +1744,7 @@ function initPlane(Program, center, size) {
             TextCoord.push(0.0, 0.0);
             TextCoord.push(0.0, 1.0);
             TextCoord.push(1.0, 0.0);
-            indices.push((i*scale_z+j)*6,(i*scale_z+j)*6+1,(i*scale_z+j)*6+2,(i*scale_z+j)*6+3,(i*scale_z+j)*6+4,(i*scale_z+j)*6+5);
+            indices.push((i * scale_z + j) * 6, (i * scale_z + j) * 6 + 1, (i * scale_z + j) * 6 + 2, (i * scale_z + j) * 6 + 3, (i * scale_z + j) * 6 + 4, (i * scale_z + j) * 6 + 5);
         }
     }
     // for(var i=0;i<scale;i++){
