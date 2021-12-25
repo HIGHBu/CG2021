@@ -368,7 +368,7 @@ function drawLine(Program, buffers, modelMatrix, viewMatrix, projectionMatrix) {
         const normalize = false;
         const stride = 0;
         const offset = 0;
-        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.color);
+        Program.gl.bindBuffer(Program.gl.ARRAY_BUFFER, buffers.colors);
         Program.gl.vertexAttribPointer(
             Program.line_programInfo.attribLocations.vertexColor,
             numComponents,
@@ -1493,10 +1493,10 @@ window.onload = function () {
         /**
          * 飞机参数
          */
-        var start1 = [-1.55, -0.05, 0.1];                   // 飞机尾翼
-        var start2 = [1.55, -0.05, 0.1];
-        var end1 = [-2.0, 0.0, 5.0];
-        var end2 = [2.0, 0.0, 5.0];
+        var start1 = [-1.55, -0.05, -0.05];                   // 飞机尾翼
+        var start2 = [1.55,  -0.05, -0.05];
+        var end1 = [-2.0, 5.0, 0.0];
+        var end2 = [2.0,  5.0, 0.0];
         var size_line = [0.03, 0.01];
 
 
@@ -1628,8 +1628,10 @@ window.onload = function () {
                         // drawMTLColor(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
 
                         // 飞机气流
-                        drawLine(Program, linebuffer1, line_modelMatrix1, viewMatrix, projectionMatrix);
-                        drawLine(Program, linebuffer2, line_modelMatrix2, viewMatrix, projectionMatrix);
+                        // var line_modelMatrix;
+                        // mat4.rotate(line_modelMatrix, aircraft_modelMatrix, 90, [0,1,0]);
+                        drawLine(Program, linebuffer1, aircraft_modelMatrix, viewMatrix, projectionMatrix);
+                        drawLine(Program, linebuffer2, aircraft_modelMatrix, viewMatrix, projectionMatrix);
                     }
                 }
                 // 得分: 得分球爆炸

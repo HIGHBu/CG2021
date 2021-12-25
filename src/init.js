@@ -1473,6 +1473,38 @@ function initPlaneBuffers(gl, positions, indices, normals, TextCoord) {
         indices: indices,
     }
 }
+function initLineBuffers(gl, positions, colors, indices) {
+    //顶点缓冲区
+    const positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+    //索引缓冲区
+    const indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+
+    //法向量缓冲区
+    // const normalBuffer = gl.createBuffer();
+    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, normalBuffer);
+    // gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+
+    // //纹理缓冲区
+    // const TextureBuffer = gl.createBuffer();
+    // gl.bindBuffer(gl.ARRAY_BUFFER, TextureBuffer);
+    // gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(TextCoord), gl.STATIC_DRAW);
+
+    const colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+    return {
+        position: positionBuffer,
+        index: indexBuffer,
+        colors: colorBuffer,
+        indices: indices,
+    }
+}
 function loadShader(gl, type, source) {
     const shader = gl.createShader(type);
 
@@ -1862,7 +1894,7 @@ function initLineCube(Program, start, end, size) {
         4, 5, 6,
         5, 6, 7
     ];
-    const buffers = initPlaneBuffers(Program.gl, positions, colors, indices);
+    const buffers = initLineBuffers(Program.gl, positions, colors, indices);
     return buffers;
 }
 
