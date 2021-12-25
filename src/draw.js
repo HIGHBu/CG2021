@@ -131,7 +131,7 @@ function loadTexture(gl, texture, image, index) {
 }
 
 //天空盒的绘制部分，其纹理坐标与世界坐标是对应的，所以只需要绑定纹理坐标和index信息
-function drawSkybox(Program, buffer, time, skybox, viewMatrix, projectionMatrix, lightDirection) {
+function drawSkybox(Program, buffer, time, skybox, viewMatrix, projectionMatrix, lightDirection, cloud_y) {
     {
         const numComponents = 3;//每次取出3个数值
         const type = Program.gl.FLOAT;//取出数据为浮点数类型
@@ -187,6 +187,9 @@ function drawSkybox(Program, buffer, time, skybox, viewMatrix, projectionMatrix,
     Program.gl.uniform1f(
         Program.sky_programInfo.uniformLocations.time,
         time);
+    Program.gl.uniform1f(
+        Program.sky_programInfo.uniformLocations.cloud_y,
+        cloud_y);
     {
         const offset = 0;
         const type = Program.gl.UNSIGNED_SHORT;
@@ -1653,7 +1656,7 @@ window.onload = function () {
             }
             /* 天气控制 */
             if (weather == 0) {     // 0 - 晴天
-                drawSkybox(Program, skyboxbuffer, now / 20, skybox, viewMatrix, projectionMatrix, lightDirection);
+                drawSkybox(Program, skyboxbuffer, now / 50, skybox, viewMatrix, projectionMatrix, lightDirection, nochange_translation[1] / 10);
             }
             if (weather == 1) {     // 1 - 雾天
                 drawfogSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);

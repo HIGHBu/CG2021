@@ -73,6 +73,7 @@ function initProgram() {
     uniform vec3 uLightDirection;
     uniform vec2 uResolution;
     uniform float uTime;
+    uniform float ucloud_y;
 
     vec3 random_worly(vec3 p) {
         p = vec3(
@@ -162,7 +163,7 @@ function initProgram() {
     float map(in vec3 ro, in vec3 p, float oct){
         //使云朵向前下方移动
         vec3 q = p - vec3(0.0,0.1,1.0) * uTime;
-        float g1 = 0.5+0.5*noise_worley( q*0.3 );
+        float g1 = 0.5+0.5*noise_perlin( q*0.3 );
         //q系数越大，起伏越大
         float g2 = 0.5+0.5*noise_worley( q*0.3 );
         
@@ -187,18 +188,12 @@ function initProgram() {
     const int kDiv = 1; // make bigger for higher quality
     
     vec4 raymarch( in vec3 ro, in vec3 rd, in vec3 bgcol){
-        // 视角范围
-        const float y_bottom = -6.0;
-        const float y_top =  6.0;
-        //rd本身被归一化，分量小于1，用除法，使得步进范围大
-        float t_bottom = 5. * (y_bottom-ro.y)/rd.y;
-        float t_top = 5. * (y_top-ro.y)/rd.y;
     
         // 确认需要ray march的区域
         float tmin, tmax;
 
         tmin = abs(ro.y) + 0.1;
-        tmax = tmin + 1.5;
+        tmax = tmin + 2.;
 
         float t = tmin;
         
@@ -266,7 +261,7 @@ function initProgram() {
 
     void main() {
 
-        vec3 vec = vec3(0., clamp(-1.0 + uTime, -1.0, 1.0), 0.);
+        vec3 vec = vec3(0., clamp(-0.3 - ucloud_y, -1.0, 1.0), 0.);
         gl_FragColor = render(vec, normalize(vTextureCoord));
     }
   `;
@@ -926,6 +921,7 @@ function initProgram() {
             lightDirection: gl.getUniformLocation(sky_shaderProgram, 'uLightDirection'),
             uResolution: gl.getUniformLocation(sky_shaderProgram, 'uResolution'),
             time: gl.getUniformLocation(sky_shaderProgram, 'uTime'),
+            cloud_y: gl.getUniformLocation(sky_shaderProgram, 'ucloud_y'),
         },
     };
     const fogsky_programInfo = {
