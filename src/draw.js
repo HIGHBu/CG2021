@@ -1427,12 +1427,12 @@ window.onload = function () {
         const Program = initProgram();
         //天空盒对应的纹理，为http://www.cad.zju.edu.cn/home/hwu/cg.html 中提供的环境纹理
         var skybox_urls = [
-            "../texture/pavilion_skybox/right.png",
-            "../texture/pavilion_skybox/left.png",
-            "../texture/pavilion_skybox/up.png",
-            "../texture/pavilion_skybox/down.png",
-            "../texture/pavilion_skybox/back.png",
-            "../texture/pavilion_skybox/front.png",
+            "../texture/pavilion_skybox/right.jpg",
+            "../texture/pavilion_skybox/left.jpg",
+            "../texture/pavilion_skybox/up.jpg",
+            "../texture/pavilion_skybox/down.jpg",
+            "../texture/pavilion_skybox/back.jpg",
+            "../texture/pavilion_skybox/front.jpg",
         ];
         var skybox = loadSkybox(Program.gl, skybox_urls);
         var center = [0, 0, 0];
