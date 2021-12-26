@@ -1421,7 +1421,7 @@ function initParticleBuffers(gl, start, end, lifetime, color, indices) {
     gl.bindBuffer(gl.ARRAY_BUFFER, lifeBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lifetime), gl.STATIC_DRAW);
 
-    //开始顶点缓冲区
+    //颜色顶点缓冲区
     const colorBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(color), gl.STATIC_DRAW);
