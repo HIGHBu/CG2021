@@ -1,4 +1,4 @@
-var weather = 0;        // 0代表晴天，1代表雾天
+var weather = 1;        // 0代表晴天，1代表雾天
 
 var objbuffers = [];
 var objDocArray = [];
@@ -68,7 +68,7 @@ var nochange_rotation = new Rotation(0, [0, 1, 0]);
 var modelxrotation = new Rotation(Math.PI / 2, [1, 0, 0]);
 var modelyrotation = new Rotation(Math.PI, [0, 1, 0]);
 var modelzrotation = new Rotation(0, [0, 0, 1]);
-
+var modelxrotation_90 = new Rotation(Math.PI * 3 / 2, [1, 0, 0]);
 /* 改变天气 */
 function change_weather() {
     weather = 1 - weather;
@@ -1421,8 +1421,14 @@ window.onload = function () {
         }
     }
     function setLightdirection(deltaTime) {
-        sum_theta = sum_theta + deltaTime;
-        return [Math.SQRT2 * Math.cos(sum_theta / 10.0), Math.SQRT2 * Math.sin(sum_theta / 10.0), 0.0];
+        sum_theta = sum_theta + deltaTime * 0.3;
+        var temp1 = Math.cos(sum_theta / 10.0);
+        var temp2 = Math.sin(sum_theta / 10.0);
+        // if(temp1 < 0.2)
+        //     temp1 = 0.2;
+        // if(temp2 < 0.2)
+        //     temp2 = 0.2;
+        return [Math.SQRT2 * temp1, Math.SQRT2 * temp2, 0.0];
     }
     show();
 
@@ -1440,7 +1446,7 @@ window.onload = function () {
         var skybox = loadSkybox(Program.gl, skybox_urls);
         var center = [0, 0, 0];
         var size = [3, 4, 5];
-        var size_plane = [200.0, 0.0, 3000.0];   // 地面Size
+        var size_plane = [2000.0, 0.0, 3000.0];   // 地面Size
         var color = [1, 0, 0, 1];
 
         /**
@@ -1508,12 +1514,12 @@ window.onload = function () {
          */
         var black = [0.0, 0.0, 0.0, 1.0];
         var gold = [205 / 255.0, 127 / 255.0, 50 / 255.0, 1.0];
-        var center_cone = [0.0, 2.0, 3.0];
-        var center_cylinder = [-4.0, 2.0, 3.0];
-        var radius_cone = 1.0;
-        var height_cone = 1.0;
-        var radius_cylinder = 1.0;
-        var height_cylinder = 1.0;
+        var center_cone = [0.0, 15.0, -20.0];
+        var center_cylinder = [-0.0, 15.0, -18.0];
+        var radius_cone = 2.0;
+        var height_cone = 2.0;
+        var radius_cylinder = 2.0;
+        var height_cylinder = 2.0;
         const conebuffer = initOneCone(Program, center_cylinder, radius_cylinder, height_cylinder, gold);
         const cylinderbuffer = initOneCylinder(Program, center_cone, radius_cone, height_cone, gold);
 
@@ -1523,7 +1529,7 @@ window.onload = function () {
         const boomparticlebuffer = initParticle(Program, center, black, 5000, 1.6, 0.5, 0.3);
 
         // 地面
-        var centerPlane = [0.0, -15.0, 0.0];
+        var centerPlane = [0.0, -20.0, 0.0];
 
         // 天空盒
         const skyboxbuffer = initSkybox(Program);
@@ -1592,8 +1598,8 @@ window.onload = function () {
 
             const line_modelMatrix1 = setModelMatrix(translation, rotation);
             const line_modelMatrix2 = setModelMatrix(translation, rotation);
-            const cone_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation);
-            const cylinder_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation);
+            const cone_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, modelxrotation_90);
+            const cylinder_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, modelxrotation_90);
 
             requestAnimationFrame(render);
             draw2D(Program.ctx);
@@ -1619,8 +1625,8 @@ window.onload = function () {
                                 drawShadow(Program, ballBuffer[i], ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                         }
                         // 圆柱和圆锥 - 阴影
-                        // drawShadow(Program, conebuffer, cone_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
-                        // drawShadow(Program, cylinderbuffer, cylinder_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                        drawShadow(Program, conebuffer, cone_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                        drawShadow(Program, cylinderbuffer, cylinder_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
 
                         Program.gl.bindFramebuffer(Program.gl.FRAMEBUFFER, null);               // Change the drawing destination to color buffer
                         Program.gl.viewport(0, 0, cw, ch);
@@ -1660,13 +1666,14 @@ window.onload = function () {
             }
             if (weather == 1) {     // 1 - 雾天
                 drawfogSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
+                if(plane_height <= 100) {
+                    drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight, 3, lightDirection);
+                }
             }
             // 地面
             // drawTexture(Program, ballBuffer[0], plane_modelMatrix, viewMatrix, projectionMatrix, 2, lightDirection);
             // drawfogTexture(Program, planebuffer, ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
-            if(plane_height <= 100) {
-                drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight, 3, lightDirection);
-            }
+
 
             // 球
             for (var i = 0; i < numOfBalls; ++i) {
@@ -1674,8 +1681,8 @@ window.onload = function () {
                     drawfogTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
                 }
             }
-            // draw(Program,conebuffer,cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
-            // draw(Program,cylinderbuffer,cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
+            draw(Program,conebuffer,cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
+            draw(Program,cylinderbuffer,cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
             nochange_translation[2] += deltaTime * speed;   // 让飞机每秒都按速度向前
             plane_translation[2] += deltaTime * speed;   // 让飞机每秒都按速度向前
         }

@@ -1186,29 +1186,29 @@ function handleMouseMove(event) {
 function handleKeyDown(event) {
     if (airCrash) return;    // 飞机已坠毁, 禁用控制
     //currentlyPressedKeys[event.keyCode] = true;
-    if (String.fromCharCode(event.keyCode) == "W") {        // 加速，model和view同步
+    if (String.fromCharCode(event.keyCode) == "Q") {        // 加速，model和view同步
         if (speed < 24) speed += del;    // 飞机最大速度
     }
     else if (String.fromCharCode(event.keyCode) == "A") {   // 飞机向左的旋转效果
         planeIsRotating = true;
-        translation[0] -= del;
+        translation[0] -= del * 1.2;
         if (rotation.rad < 0.7)
             rotation.rad += del / 2;
         rotation.axis = [0, 0, 1];
     }
-    else if (String.fromCharCode(event.keyCode) == "S") {   // 减速，model和view同步
+    else if (String.fromCharCode(event.keyCode) == "E") {   // 减速，model和view同步
         if (speed > del) {
             speed -= del;
         }
     }
     else if (String.fromCharCode(event.keyCode) == "D") {   // 飞机向右的旋转效果
         planeIsRotating = true;
-        translation[0] += del;
+        translation[0] += del * 1.2;
         if (rotation.rad > -0.7)
             rotation.rad -= del / 2;
         rotation.axis = [0, 0, 1];
     }
-    else if (String.fromCharCode(event.keyCode) == "Q") {   // 飞机向下
+    else if (String.fromCharCode(event.keyCode) == "S") {   // 飞机向下
         planeIsRotating = true;
         // console.log("modelxrotation =" + modelxrotation.rad);
         if (modelxrotation.rad > 1.3)
@@ -1217,17 +1217,17 @@ function handleKeyDown(event) {
         //     rotation.rad -= del;
         // rotation.axis = [1, 0, 0];
         nochange_translation[1] += del;
-        plane_translation[1] += del * 50;
-        plane_height -= 3.0;
+        plane_translation[1] += del;
+        plane_height -= 2.0;
 
     }
-    else if (String.fromCharCode(event.keyCode) == "E") {   // 飞机向上
+    else if (String.fromCharCode(event.keyCode) == "W") {   // 飞机向上
         planeIsRotating = true;
         if (modelxrotation.rad < 2.2)
             modelxrotation.rad += del / 2;
         nochange_translation[1] -= del;
-        plane_translation[1] -= del * 50;
-        plane_height += 3.0;
+        plane_translation[1] -= del;
+        plane_height += 2.0;
     }
     else if (String.fromCharCode(event.keyCode) == "Z") {//Zoom to fit
         var distance = Math.pow(eye[0] - target[0], 2) + Math.pow(eye[1] - target[1], 2) + Math.pow(eye[2] - target[2], 2);
@@ -1236,6 +1236,9 @@ function handleKeyDown(event) {
         eye[1] = eye[1] - (eye[1] - target[1]) / distance * sum_deltaY * 0.001;
         eye[2] = eye[2] - (eye[2] - target[2]) / distance * sum_deltaY * 0.001;
         sum_deltaY = 0.0;
+    }
+    else if(String.fromCharCode(event.keyCode) == "H"){
+        change_weather();
     }
 }
 function handleKeyUp(event) {
@@ -1743,7 +1746,7 @@ function initParticle(Program, center, color, num, startscale, endscale, speed) 
     return buffers;
 }
 function initPlane(Program, center, size) {
-    var scale_x = 10.0;
+    var scale_x = 100.0;
     var scale_z = 100.0;
     const point = [center[0] - size[0] / 2, center[1] - size[1] / 2, center[2] - size[2] / 2];
     const positions = [];
