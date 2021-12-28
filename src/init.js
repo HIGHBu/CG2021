@@ -1242,7 +1242,7 @@ function handleKeyDown(event) {
     }
 }
 function handleKeyUp(event) {
-    if (String.fromCharCode(event.keyCode) == "E" || String.fromCharCode(event.keyCode) == "Q" || String.fromCharCode(event.keyCode) == "A" || String.fromCharCode(event.keyCode) == "D") {
+    if (String.fromCharCode(event.keyCode) == "W" || String.fromCharCode(event.keyCode) == "S" || String.fromCharCode(event.keyCode) == "A" || String.fromCharCode(event.keyCode) == "D") {
         planeIsRotating = false;
     }
 }

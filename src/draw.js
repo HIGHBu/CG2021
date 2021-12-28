@@ -50,6 +50,8 @@ var del = 0.05;
 
 var translation = [0, 0, 0];                // 飞机的平移矩阵
 var nochange_translation = [0, 0, -50];     // 物体的平移矩阵
+var nochange_scale = [1.0, 1.0, 1.0];
+var sinball_scale = [1.0, 1.0, 1.0];
 var plane_translation = [0, 0, -50];     // 地板的平移矩阵
 
 var lightColor = [1.0, 1.0, 1.0];
@@ -1285,6 +1287,7 @@ window.onload = function () {
             Program.shadow_programInfo.uniformLocations.viewMatrix,
             false,
             viewMatrix);
+        // console.log(modelMatrix)
         Program.gl.uniformMatrix4fv(
             Program.shadow_programInfo.uniformLocations.modelMatrix,
             false,
@@ -1298,16 +1301,38 @@ window.onload = function () {
         }
     }
     //设置模型矩阵，translation为模型的平移，rotation为模型的旋转。modelrotation，modelrotation用于模型的方向修正
-    function setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation,) {
+    function setModelMatrix(translation, rotation, scale, modelxrotation, modelyrotation, modelzrotation, center) {
         const modelMatrix = mat4.create();
+
         mat4.translate(modelMatrix,     // destination matrix
             modelMatrix,     // matrix to translate
             translation);  // amount to translate
+    
         mat4.rotate(modelMatrix,  // destination matrix
             modelMatrix,  // matrix to rotate
             rotation.rad,     // amount to rotate in radians
             rotation.axis);       // axis to rotate around (Z)
-        if (modelxrotation)
+        
+        if(center){
+            //console.log(center);
+            var center0 = [];
+            center0[0] = -center[0];
+            center0[1] = -center[1];
+            center0[2] = -center[2];
+            mat4.translate(modelMatrix,     // destination matrix
+                modelMatrix,     // matrix to translate
+                center);  // amount to translate
+            mat4.scale(modelMatrix,  // destination matrix
+                modelMatrix,  // matrix to rotate
+                scale);       // axis to rotate around (Z)
+            mat4.translate(modelMatrix,     // destination matrix
+                modelMatrix,     // matrix to translate
+                center0);  // amount to translate                
+        }
+
+
+    
+            if (modelxrotation)
             mat4.rotate(modelMatrix,  // destination matrix
                 modelMatrix,  // matrix to rotate
                 modelxrotation.rad,     // amount to rotate in radians
@@ -1321,7 +1346,8 @@ window.onload = function () {
             mat4.rotate(modelMatrix,  // destination matrix
                 modelMatrix,  // matrix to rotate
                 modelzrotation.rad,     // amount to rotate in radians
-                modelzrotation.axis);       // axis to rotate around (Z)           
+                modelzrotation.axis);       // axis to rotate around (Z)       
+        //console.log(modelMatrix)    
         return modelMatrix;
     }
 
@@ -1398,7 +1424,7 @@ window.onload = function () {
         for (let i = 0; i < ballSet.length; i++) {
             // 碰撞
             if (ballSet[i].check(px, py, 1.5 * planeSize) && ballSet[i].exist) {
-                console.log("[Collision] " + i);
+                // console.log("[Collision] " + i);
                 if (ballSet[i].type == 1) {  // 得分球
                     change_score();
                     ++score;
@@ -1504,8 +1530,8 @@ window.onload = function () {
          */
         var start1 = [-1.55, -0.05, -0.05];                   // 飞机尾翼
         var start2 = [1.55,  -0.05, -0.05];
-        var end1 = [-2.0, 5.0, 0.0];
-        var end2 = [2.0,  5.0, 0.0];
+        var end1 = [-2.0, 10.0, 0.0];
+        var end2 = [2.0,  10.0, 0.0];
         var size_line = [0.03, 0.01];
 
 
@@ -1550,18 +1576,27 @@ window.onload = function () {
         Program.gl.clearColor(0, 0, 0, 1);
         Program.gl.enable(Program.gl.DEPTH_TEST);
 
-
         var then = 0;
         // Draw the scene repeatedly
         function render(now) {
+
+            now *= 0.001;  // convert to seconds
+            const deltaTime = now - then;
+            then = now;
+
             // console.log(nochange_translation);
             if (nochange_translation[2] > numOfBalls * 15 + 100) {
                 document.getElementById("win").style.display = "block";
                 speed = 3;
             }
+            //console.log(sinball_scale);
 
             const planebuffer = initPlane(Program, centerPlane, size_plane);
-
+            // console.log(sinball_scale);
+            sinball_scale[0] = 1.5 + 0.3 *Math.sin(now);
+            sinball_scale[1] = 1.5 + 0.3 *Math.sin(now);
+            sinball_scale[2] = 1.5 + 0.3 *Math.sin(now);
+            // console.log(sinball_scale);
             // 飞机方向纠正
             if (!planeIsRotating) {
                 if (rotation.rad > 0.03)
@@ -1578,9 +1613,7 @@ window.onload = function () {
             const linebuffer1 = initLineCube(Program, start1, end1, size_line);
             const linebuffer2 = initLineCube(Program, start2, end2, size_line);
             checkCollision();   // 碰撞检测
-            now *= 0.001;  // convert to seconds
-            const deltaTime = now - then;
-            then = now;
+
             var lightDirection = setLightdirection(deltaTime);
             var LIGHT_X = -lightDirection[0] * light_Scale, LIGHT_Y = -lightDirection[1] * light_Scale, LIGHT_Z = -lightDirection[2] * light_Scale;
 
@@ -1590,16 +1623,16 @@ window.onload = function () {
             const viewMatrixFromLight = setViewMatrixFromLight(LIGHT_X, LIGHT_Y, LIGHT_Z);
 
             // const modelMatrix = setModelMatrix(translation, rotation);
-            const ball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation);
-            const aircraft_modelMatrix = setModelMatrix(translation, rotation, modelxrotation, modelyrotation, modelzrotation);
-            const boom_modelMatrix = setModelMatrix(translation, rotation);
-            const prize_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation);
-            const plane_modelMatrix = setModelMatrix(plane_translation, nochange_rotation);
+            const ball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, nochange_scale);
+            const aircraft_modelMatrix = setModelMatrix(translation, rotation, nochange_scale, modelxrotation, modelyrotation, modelzrotation);
+            const boom_modelMatrix = setModelMatrix(translation, rotation, nochange_scale);
+            const prize_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, nochange_scale);
+            const plane_modelMatrix = setModelMatrix(plane_translation, nochange_rotation, nochange_scale);
 
-            const line_modelMatrix1 = setModelMatrix(translation, rotation);
-            const line_modelMatrix2 = setModelMatrix(translation, rotation);
-            const cone_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, modelxrotation_90);
-            const cylinder_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, modelxrotation_90);
+            const line_modelMatrix1 = setModelMatrix(translation, rotation, nochange_scale);
+            const line_modelMatrix2 = setModelMatrix(translation, rotation, nochange_scale);
+            const cone_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, nochange_scale, modelxrotation_90);
+            const cylinder_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, nochange_scale, modelxrotation_90);
 
             requestAnimationFrame(render);
             draw2D(Program.ctx);
@@ -1622,7 +1655,14 @@ window.onload = function () {
                         // 球体阴影
                         for (var i = 0; i < numOfBalls; ++i) {
                             if (ballSet[i].exist)
-                                drawShadow(Program, ballBuffer[i], ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                                if(i % 7){
+                                    drawShadow(Program, ballBuffer[i], ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+
+                                }
+                                else{
+                                    var sinball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, sinball_scale, null, null, null, ballCenter[i]);
+                                    drawShadow(Program, ballBuffer[i], sinball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
+                                }
                         }
                         // 圆柱和圆锥 - 阴影
                         drawShadow(Program, conebuffer, cone_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
@@ -1663,24 +1703,44 @@ window.onload = function () {
             /* 天气控制 */
             if (weather == 0) {     // 0 - 晴天
                 drawSkybox(Program, skyboxbuffer, now / 50, skybox, viewMatrix, projectionMatrix, lightDirection, nochange_translation[1] / 10);
+                for (var i = 0; i < numOfBalls; ++i) {
+                    if (ballSet[i].exist) {
+                        if(i % 7)
+                            drawTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
+                        else{
+                            var sinball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, sinball_scale, null, null, null, ballCenter[i]);
+                            drawTexture(Program, ballBuffer[i], sinball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
+                        }
+
+                    }
+                }
+
             }
             if (weather == 1) {     // 1 - 雾天
                 drawfogSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
                 if(plane_height <= 100) {
                     drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight, 3, lightDirection);
                 }
+                            // 球
+                for (var i = 0; i < numOfBalls; ++i) {
+                    if (ballSet[i].exist) {
+                        if(i % 7)
+                            drawfogTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
+                        else{
+                            var sinball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, sinball_scale, null, null, null, ballCenter[i]);
+                            drawfogTexture(Program, ballBuffer[i], sinball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
+
+                        }
+
+                    }
+                }
+
             }
             // 地面
             // drawTexture(Program, ballBuffer[0], plane_modelMatrix, viewMatrix, projectionMatrix, 2, lightDirection);
             // drawfogTexture(Program, planebuffer, ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
 
 
-            // 球
-            for (var i = 0; i < numOfBalls; ++i) {
-                if (ballSet[i].exist) {
-                    drawfogTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
-                }
-            }
             draw(Program,conebuffer,cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
             draw(Program,cylinderbuffer,cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
             nochange_translation[2] += deltaTime * speed;   // 让飞机每秒都按速度向前
