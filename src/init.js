@@ -1778,28 +1778,6 @@ function initPlane(Program, center, size) {
             indices.push((i * scale_z + j) * 6, (i * scale_z + j) * 6 + 1, (i * scale_z + j) * 6 + 2, (i * scale_z + j) * 6 + 3, (i * scale_z + j) * 6 + 4, (i * scale_z + j) * 6 + 5);
         }
     }
-    // for(var i=0;i<scale;i++){
-    //     positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
-    //     positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
-    //     positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
-    //     positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
-    //     positions.push(center[0] - size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] + size[2] / 2);
-    //     positions.push(center[0] + size[0] / 2); positions.push(center[1] + size[1] / 2); positions.push(center[2] - size[2] / 2);
-    //     normals.push(0.0, 1.0, 0.0);
-    //     normals.push(0.0, 1.0, 0.0);
-    //     normals.push(0.0, 1.0, 0.0);
-    //     normals.push(0.0, 1.0, 0.0);
-    //     normals.push(0.0, 1.0, 0.0);
-    //     normals.push(0.0, 1.0, 0.0);
-    //     TextCoord.push(1.0, 1.0);
-    //     TextCoord.push(0.0, 1.0);
-    //     TextCoord.push(1.0, 0.0);
-    //     TextCoord.push(0.0, 0.0);
-    //     TextCoord.push(0.0, 1.0);
-    //     TextCoord.push(1.0, 0.0);
-    //     indices.push(i*6,i*6+1,i*6+2,i*6+3,i*6+4,i*6+5);
-    // }
-
     const buffers = initPlaneBuffers(Program.gl, positions, indices, normals, TextCoord);
     return buffers;
 }
