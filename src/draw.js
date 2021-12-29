@@ -39,7 +39,7 @@ function Game_Restart() {
 
 var eye = [0, 0, 6];
 var sum_deltaY = 0.0;
-var sum_theta = 0.0;
+var sum_theta = 2.0;
 var target = [0, 0, 0];
 var up = [0, 2, 0];
 var cw = 0.0;
@@ -58,7 +58,7 @@ var lightColor = [1.0, 1.0, 1.0];
 var ambientLight = [0.4, 0.4, 0.4];
 var fogdenisty = 0.3;
 
-var light_Scale = 50.0;
+var light_Scale = 100.0;
 
 var Rotation = function (rad, axis) {
     this.rad = rad;
@@ -1307,13 +1307,13 @@ window.onload = function () {
         mat4.translate(modelMatrix,     // destination matrix
             modelMatrix,     // matrix to translate
             translation);  // amount to translate
-    
+
         mat4.rotate(modelMatrix,  // destination matrix
             modelMatrix,  // matrix to rotate
             rotation.rad,     // amount to rotate in radians
             rotation.axis);       // axis to rotate around (Z)
-        
-        if(center){
+
+        if (center) {
             //console.log(center);
             var center0 = [];
             center0[0] = -center[0];
@@ -1330,9 +1330,7 @@ window.onload = function () {
                 center0);  // amount to translate                
         }
 
-
-    
-            if (modelxrotation)
+        if (modelxrotation)
             mat4.rotate(modelMatrix,  // destination matrix
                 modelMatrix,  // matrix to rotate
                 modelxrotation.rad,     // amount to rotate in radians
@@ -1385,7 +1383,7 @@ window.onload = function () {
     }
 
     function setProjectionMatrixFromLight(gl) {
-        const fieldOfView = 75 * Math.PI / 180;   // in radians
+        const fieldOfView = 45 * Math.PI / 180;   // in radians
         const aspect = OFFSCREEN_WIDTH / OFFSCREEN_HEIGHT;
         const zNear = 0.1;
         const zFar = 1000.0;
@@ -1450,10 +1448,6 @@ window.onload = function () {
         sum_theta = sum_theta + deltaTime * 0.3;
         var temp1 = Math.cos(sum_theta / 10.0);
         var temp2 = Math.sin(sum_theta / 10.0);
-        // if(temp1 < 0.2)
-        //     temp1 = 0.2;
-        // if(temp2 < 0.2)
-        //     temp2 = 0.2;
         return [Math.SQRT2 * temp1, Math.SQRT2 * temp2, 0.0];
     }
     show();
@@ -1529,9 +1523,9 @@ window.onload = function () {
          * 飞机参数
          */
         var start1 = [-1.55, -0.05, -0.05];                   // 飞机尾翼
-        var start2 = [1.55,  -0.05, -0.05];
+        var start2 = [1.55, -0.05, -0.05];
         var end1 = [-2.0, 10.0, 0.0];
-        var end2 = [2.0,  10.0, 0.0];
+        var end2 = [2.0, 10.0, 0.0];
         var size_line = [0.03, 0.01];
 
 
@@ -1593,9 +1587,9 @@ window.onload = function () {
 
             const planebuffer = initPlane(Program, centerPlane, size_plane);
             // console.log(sinball_scale);
-            sinball_scale[0] = 1.5 + 0.3 *Math.sin(now);
-            sinball_scale[1] = 1.5 + 0.3 *Math.sin(now);
-            sinball_scale[2] = 1.5 + 0.3 *Math.sin(now);
+            sinball_scale[0] = 1.5 + 0.3 * Math.sin(now);
+            sinball_scale[1] = 1.5 + 0.3 * Math.sin(now);
+            sinball_scale[2] = 1.5 + 0.3 * Math.sin(now);
             // console.log(sinball_scale);
             // 飞机方向纠正
             if (!planeIsRotating) {
@@ -1648,18 +1642,14 @@ window.onload = function () {
 
                         drawShadow(Program, objbuffers[0], aircraft_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
 
-                        // 飞机气流阴影
-                        // drawShadow(Program, linebuffer1, line_modelMatrix1, viewMatrixFromLight, projectionMatrixFromLight);
-                        // drawShadow(Program, linebuffer2, line_modelMatrix2, viewMatrixFromLight, projectionMatrixFromLight);
-
                         // 球体阴影
                         for (var i = 0; i < numOfBalls; ++i) {
                             if (ballSet[i].exist)
-                                if(i % 7){
+                                if (i % 7) {
                                     drawShadow(Program, ballBuffer[i], ball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
 
                                 }
-                                else{
+                                else {
                                     var sinball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, sinball_scale, null, null, null, ballCenter[i]);
                                     drawShadow(Program, ballBuffer[i], sinball_modelMatrix, viewMatrixFromLight, projectionMatrixFromLight);
                                 }
@@ -1674,11 +1664,7 @@ window.onload = function () {
 
                         // 飞机纹理
                         drawMTLTexture(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, 2, lightDirection);
-                        // drawMTLColor(Program, objbuffers[0], aircraft_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
 
-                        // 飞机气流
-                        // var line_modelMatrix;
-                        // mat4.rotate(line_modelMatrix, aircraft_modelMatrix, 90, [0,1,0]);
                         drawLine(Program, linebuffer1, aircraft_modelMatrix, viewMatrix, projectionMatrix);
                         drawLine(Program, linebuffer2, aircraft_modelMatrix, viewMatrix, projectionMatrix);
                     }
@@ -1705,9 +1691,9 @@ window.onload = function () {
                 drawSkybox(Program, skyboxbuffer, now / 50, skybox, viewMatrix, projectionMatrix, lightDirection, nochange_translation[1] / 10);
                 for (var i = 0; i < numOfBalls; ++i) {
                     if (ballSet[i].exist) {
-                        if(i % 7)
+                        if (i % 7)
                             drawTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
-                        else{
+                        else {
                             var sinball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, sinball_scale, null, null, null, ballCenter[i]);
                             drawTexture(Program, ballBuffer[i], sinball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
                         }
@@ -1718,15 +1704,15 @@ window.onload = function () {
             }
             if (weather == 1) {     // 1 - 雾天
                 drawfogSkybox(Program, skyboxbuffer, skybox, viewMatrix, projectionMatrix);
-                if(plane_height <= 100) {
+                if (plane_height <= 100) {
                     drawPlane(Program, planebuffer, plane_modelMatrix, viewMatrix, projectionMatrix, viewMatrixFromLight, projectionMatrixFromLight, 3, lightDirection);
                 }
-                            // 球
+                // 球
                 for (var i = 0; i < numOfBalls; ++i) {
                     if (ballSet[i].exist) {
-                        if(i % 7)
+                        if (i % 7)
                             drawfogTexture(Program, ballBuffer[i], ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
-                        else{
+                        else {
                             var sinball_modelMatrix = setModelMatrix(nochange_translation, nochange_rotation, sinball_scale, null, null, null, ballCenter[i]);
                             drawfogTexture(Program, ballBuffer[i], sinball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
 
@@ -1741,8 +1727,8 @@ window.onload = function () {
             // drawfogTexture(Program, planebuffer, ball_modelMatrix, viewMatrix, projectionMatrix, ballSet[i].type, lightDirection);
 
 
-            draw(Program,conebuffer,cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
-            draw(Program,cylinderbuffer,cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
+            draw(Program, conebuffer, cone_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
+            draw(Program, cylinderbuffer, cylinder_modelMatrix, viewMatrix, projectionMatrix, lightDirection);
             nochange_translation[2] += deltaTime * speed;   // 让飞机每秒都按速度向前
             plane_translation[2] += deltaTime * speed;   // 让飞机每秒都按速度向前
         }
