@@ -823,7 +823,8 @@ function initProgram() {
         vec3 shadowCoord = (v_PositionFromLight.xyz/v_PositionFromLight.w)/2.0 + 0.5;
         vec4 rgbaDepth = texture2D(uShadowMap, shadowCoord.xy);
         float depth = unpackDepth(rgbaDepth);
-        float visibility =(shadowCoord.z > depth + 0.0015)? 0.7:1.0;
+        // float visibility =(shadowCoord.z > depth + 0.0015)? 0.7:1.0;
+        float visibility =(shadowCoord.z > depth + 0.0015)? 1.0:0.7;
         // gl_FragColor = vec4(tmp_Color.rgb * visibility, 1.0-plane_height/50.0);
         gl_FragColor = vec4(tmp_Color.rgb * visibility, 1.0);
 
