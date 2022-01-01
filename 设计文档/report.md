@@ -3,8 +3,8 @@
 > - 2021-2022秋冬，计算机图形学课程项目
 > - 简单三维建模及真实感绘制 —— 飞行模拟器
 > - 小组成员
->   - 董乙灿，319010
->   - 高晨熙：319010
+>   - 董乙灿，3190105140
+>   - 高晨熙：3190103302
 >   - 夏霄汉：3190102367
 
 [TOC]
@@ -592,11 +592,11 @@ $$
 
 - 飞机控制
 
-  - `W S`：飞机加速/减速，直接修改`speed`变量
+  - `Q E`：飞机加速/减速，直接修改`speed`变量
 
   - `A D`：飞机左转/右转，修改飞机模型矩阵中的`translation`和`rotation`部分，使得飞机绕Z轴旋转的同时沿着Y轴左右移动
 
-  - `Q E`：飞机俯冲/爬升，修改飞机模型矩阵中的`rotation`部分，使得飞机绕着Y轴旋转
+  - `W S`：飞机俯冲/爬升，修改飞机模型矩阵中的`rotation`部分，使得飞机绕着Y轴旋转
 
   - 为了优化飞机控制的操作感，给所有的旋转操作（转弯和爬升俯冲）加上阈值，设定最大旋转角度并在旋转结束后恢复成原来的角度
 
@@ -605,7 +605,7 @@ $$
     ```js
     function handleKeyDown(event) {
         if(airCrash) return;    // 飞机已坠毁, 禁用控制
-        if (String.fromCharCode(event.keyCode) == "W") {        // 加速，model和view同步
+        if (String.fromCharCode(event.keyCode) == "Q") {        // 加速，model和view同步
             if(speed < 24) speed += del;    // 飞机最大速度
         }
         else if (String.fromCharCode(event.keyCode) == "A") {   // 飞机向左的旋转效果
@@ -615,7 +615,7 @@ $$
                 rotation.rad += del / 2;
             rotation.axis = [0, 0, 1];
         }
-        else if (String.fromCharCode(event.keyCode) == "S") {   // 减速，model和view同步
+        else if (String.fromCharCode(event.keyCode) == "E") {   // 减速，model和view同步
             if (speed > del) {
                 speed -= del;
             }
@@ -627,13 +627,13 @@ $$
                 rotation.rad -= del / 2;
             rotation.axis = [0, 0, 1];
         }
-        else if (String.fromCharCode(event.keyCode) == "Q") {   // 飞机向下
+        else if (String.fromCharCode(event.keyCode) == "S") {   // 飞机向下
             planeIsRotating = true;
             if(modelxrotation.rad > 1.3)
             modelxrotation.rad -= del / 2;
             nochange_translation[1] += del;
         }
-        else if (String.fromCharCode(event.keyCode) == "E") {   // 飞机向上
+        else if (String.fromCharCode(event.keyCode) == "W") {   // 飞机向上
             planeIsRotating = true;
             if(modelxrotation.rad < 2.2)
                 modelxrotation.rad += del / 2;
@@ -1294,7 +1294,7 @@ Program.gl.clear(Program.gl.COLOR_BUFFER_BIT | Program.gl.DEPTH_BUFFER_BIT);    
 
 制作阴影纹理的原理是制作一张包含了来自光源视角的深度数据
 
-<img src="E:\Desktop\2021-2022-1\Computer Graphics\CG2021\设计文档\assets\image-20211225233457179.png" alt="image-20211225233457179" style="zoom:50%;" />
+<img src="assets/image-20211225233457179.png" alt="image-20211225233457179" style="zoom:50%;" />
 
 
 
@@ -1439,5 +1439,5 @@ const plane_fsSource = `
 
 以下为实时阴影效果图
 
-![image-20211225235645671](E:\Desktop\2021-2022-1\Computer Graphics\CG2021\设计文档\assets\image-20211225235645671.png)
+![image-20211225235645671](assets/image-20211225235645671.png)
 
