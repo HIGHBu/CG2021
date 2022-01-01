@@ -1135,6 +1135,22 @@ fogAmount = max(0.4,fogAmount);
 vec4 color=mix(v_Color, fogcolor, fogAmount); 
 ```
 
+#### 1.6.4 切换天气
+
+按下H键即可实现雾天和晴天效果的切换。雾天实现了雾化效果，晴天实现了动态云效果。
+
+```js
+function change_weather() {
+    weather = 1 - weather;
+}
+function handleKeyDown(event){
+    if...
+    else if(String.fromCharCode(event.keyCode) == "H"){
+        change_weather();
+    }
+}
+```
+
 
 
 ## 2 额外要求
